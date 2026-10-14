@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -15,7 +15,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if ('quantity' in body) update.quantity = body.quantity
   if ('checked_at' in body) update.checked_at = body.checked_at
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('shopping_items')
     .update(update)
     .eq('id', params.id)
@@ -30,7 +30,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { error } = await supabase.from('shopping_items').delete().eq('id', params.id)
+  const { error } = await getSupabase().from('shopping_items').delete().eq('id', params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return new NextResponse(null, { status: 204 })
 }

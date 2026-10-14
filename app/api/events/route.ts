@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { expandEvent } from '@/lib/recurrence'
 import type { CalendarEvent } from '@/lib/types'
 
@@ -9,7 +9,7 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('events')
     .select('*')
     .order('start_at', { ascending: true })
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('events')
     .insert({
       title: body.title,
