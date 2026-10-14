@@ -65,7 +65,7 @@ export function CalendarPanel({ events, loading, onRefresh }: Props) {
       </div>
 
       {/* Panel body */}
-      <div className="flex-1 overflow-y-auto panel-scroll p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto panel-scroll p-3 space-y-3 max-h-[60dvh] lg:max-h-none">
         {loading && (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
@@ -75,7 +75,7 @@ export function CalendarPanel({ events, loading, onRefresh }: Props) {
         )}
 
         {!loading && days.length === 0 && (
-          <div className="text-center py-8">
+          <div className="text-center py-5 lg:py-8">
             <p className="text-2xl mb-2">🗓️</p>
             <p className="text-sm text-gray-500">No events in the next 14 days.</p>
             <button
