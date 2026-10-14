@@ -27,5 +27,12 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    // Pin the auth secret so session cookies minted in tests/e2e/session.ts
+    // validate here. Test-only value; the real secret lives in Vercel.
+    env: {
+      NEXTAUTH_SECRET:
+        process.env.NEXTAUTH_SECRET ?? "e2e-only-secret-not-a-real-credential",
+      NEXTAUTH_URL: `http://127.0.0.1:${PORT}`,
+    },
   },
 });

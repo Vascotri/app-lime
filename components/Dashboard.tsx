@@ -57,7 +57,7 @@ export function Dashboard({ userName }: Props) {
             <span className="font-semibold text-gray-900 text-sm">Lime</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600 hidden sm:block">Hey, {userName} 👋</span>
+            <span className="text-sm text-gray-600 truncate">Hey, {userName} 👋</span>
             <button
               onClick={() => signOut({ callbackUrl: '/login' })}
               className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors"
@@ -69,19 +69,21 @@ export function Dashboard({ userName }: Props) {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-4 sm:py-6">
-        {/* Mobile: greeting */}
-        <p className="text-sm text-gray-500 mb-4 sm:hidden">Hey, {userName} 👋</p>
-
-        {/* Three-panel grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 h-full">
-          <div className="flex flex-col" style={{ minHeight: 'min(480px, 60dvh)' }}>
+      <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-6 py-3 sm:py-6">
+        {/*
+         * Panels hug their content on phones — a fixed min-height reserved
+         * ~60dvh per panel, so three stacked panels left most of the screen
+         * blank. The min-height only earns its keep from `lg` up, where the
+         * three columns sit side by side and want a common height.
+         */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div className="flex flex-col lg:min-h-[32rem]">
             <CalendarPanel events={events} loading={loadingEvents} onRefresh={fetchEvents} />
           </div>
-          <div className="flex flex-col" style={{ minHeight: 'min(480px, 60dvh)' }}>
+          <div className="flex flex-col lg:min-h-[32rem]">
             <TasksPanel tasks={tasks} loading={loadingTasks} onRefresh={fetchTasks} />
           </div>
-          <div className="flex flex-col sm:col-span-2 lg:col-span-1" style={{ minHeight: 'min(480px, 60dvh)' }}>
+          <div className="flex flex-col sm:col-span-2 lg:col-span-1 lg:min-h-[32rem]">
             <ShoppingPanel items={items} loading={loadingItems} onRefresh={fetchItems} />
           </div>
         </div>
