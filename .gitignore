@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+build
+*.tsbuildinfo
+
+# Playwright (responsive e2e) artifacts
+/test-results
+/playwright-report
+/playwright/.cache
+
+# local env (real values live in Vercel, never committed)
+.env*.local
+
+.DS_Store
