@@ -13,6 +13,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if ('title' in body) update.title = body.title
   if ('description' in body) update.description = body.description
   if ('assigned_to' in body) update.assigned_to = body.assigned_to
+  if ('category' in body) update.category = body.category
   if ('due_date' in body) update.due_date = body.due_date
   if ('completed_at' in body) update.completed_at = body.completed_at
 

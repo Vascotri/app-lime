@@ -49,6 +49,8 @@ export async function POST(request: Request) {
       end_at: body.end_at ?? null,
       all_day: body.all_day ?? false,
       recurrence: body.recurrence ?? 'none',
+      category: body.category ?? 'other',
+      attendees: body.attendees ?? 'both',
       notes: body.notes ?? null,
       created_by: session.user?.email,
     })

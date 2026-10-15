@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { Modal } from './Modal'
-import type { Category } from '@/lib/types'
-import { CATEGORY_LABELS } from '@/lib/types'
+import { Picker } from './Chip'
+import type { ShoppingCategory } from '@/lib/types'
+import { SHOPPING_CATEGORY_LABELS } from '@/lib/types'
 
 interface Props {
   onClose: () => void
@@ -12,7 +13,7 @@ interface Props {
 
 export function AddItemModal({ onClose, onSaved }: Props) {
   const [name, setName] = useState('')
-  const [category, setCategory] = useState<Category>('groceries')
+  const [category, setCategory] = useState<ShoppingCategory>('groceries')
   const [quantity, setQuantity] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -55,25 +56,13 @@ export function AddItemModal({ onClose, onSaved }: Props) {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-          <div className="grid grid-cols-2 gap-2">
-            {(Object.entries(CATEGORY_LABELS) as [Category, string][]).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setCategory(value)}
-                className={`rounded-lg border py-2 text-sm font-medium transition-colors ${
-                  category === value
-                    ? 'border-lime-500 bg-lime-50 text-lime-700'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Picker
+          label="Category"
+          options={SHOPPING_CATEGORY_LABELS}
+          value={category}
+          onChange={setCategory}
+          columns={2}
+        />
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>

@@ -16,6 +16,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       end_at: body.end_at ?? null,
       all_day: body.all_day ?? false,
       recurrence: body.recurrence ?? 'none',
+      category: body.category ?? 'other',
+      attendees: body.attendees ?? 'both',
       notes: body.notes ?? null,
     })
     .eq('id', params.id)
