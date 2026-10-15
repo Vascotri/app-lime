@@ -1,8 +1,9 @@
 import { getAccessToken, GoogleReconnectRequired } from './google-tokens'
 import { getSetting, setSetting, FAMILY_CALENDAR_ID } from './settings'
-import { toCalendarEvents, type GoogleEvent } from './google-events'
-import { ALLOWED_EMAILS } from './types'
-import type { CalendarEvent } from './types'
+import { toCalendarEvents, mergeEvents, type GoogleEvent } from './google-events'
+import { ALLOWED_EMAILS, EMAIL_TO_NAME } from './types'
+import type { CalendarEvent, Person } from './types'
+import { getTokens } from './google-tokens'
 
 const API = 'https://www.googleapis.com/calendar/v3'
 
@@ -127,6 +128,124 @@ export async function listEvents(
   )) as { items?: GoogleEvent[] }
 
   return toCalendarEvents(payload?.items ?? [])
+}
+
+interface CalendarListEntry {
+  id?: string
+  summary?: string
+  accessRole?: string
+  primary?: boolean
+}
+
+/**
+ * The user's own calendars, excluding the shared Family one.
+ *
+ * Filtered to calendars they own or can write to. Subscribed feeds — national
+ * holidays, birthdays, sports fixtures — come through as `reader` and are pure
+ * noise on a family dashboard, so they never make it in.
+ */
+export async function listPersonalCalendarIds(
+  email: string,
+  familyCalendarId: string,
+): Promise<string[]> {
+  const payload = (await googleFetch(
+    email,
+    '/users/me/calendarList?minAccessRole=writer&maxResults=250',
+  )) as { items?: CalendarListEntry[] }
+
+  return (payload?.items ?? [])
+    .filter((entry): entry is CalendarListEntry & { id: string } => !!entry.id)
+    .filter((entry) => entry.id !== familyCalendarId)
+    .filter((entry) => entry.accessRole === 'owner' || entry.accessRole === 'writer')
+    .map((entry) => entry.id)
+}
+
+async function fetchEvents(
+  email: string,
+  calendarId: string,
+  from: Date,
+  to: Date,
+): Promise<GoogleEvent[]> {
+  const query = new URLSearchParams({
+    timeMin: from.toISOString(),
+    timeMax: to.toISOString(),
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '250',
+  })
+
+  const payload = (await googleFetch(
+    email,
+    `/calendars/${encodeURIComponent(calendarId)}/events?${query}`,
+  )) as { items?: GoogleEvent[] }
+
+  return payload?.items ?? []
+}
+
+function personFor(email: string): Person | undefined {
+  const name = EMAIL_TO_NAME[email]?.toLowerCase()
+  return name === 'vasco' || name === 'jennifer' ? name : undefined
+}
+
+/**
+ * Everything the family has on, from every calendar either of them owns.
+ *
+ * Reads with each person's own stored credentials — the app holds both, so one
+ * person opening the dashboard still produces the combined view rather than
+ * half of it. Personal events are marked read-only (the app has read scope
+ * only) and anything the other person marked private is reduced to "Busy"
+ * before it leaves the server.
+ *
+ * One person's connection failing degrades their half rather than the whole
+ * dashboard: a broken grant for Jennifer should not blank Vasco's day.
+ */
+export async function listAllEvents(
+  viewerEmail: string,
+  from: Date,
+  to: Date,
+): Promise<{ events: CalendarEvent[]; partial: string[] }> {
+  const familyCalendarId = await ensureFamilyCalendar(viewerEmail)
+  const viewer = personFor(viewerEmail)
+
+  const groups: CalendarEvent[][] = []
+  const partial: string[] = []
+
+  // The shared calendar, read once rather than once per member.
+  groups.push(
+    toCalendarEvents(await fetchEvents(viewerEmail, familyCalendarId, from, to), {
+      origin: 'family',
+      viewer,
+    }),
+  )
+
+  for (const email of ALLOWED_EMAILS) {
+    const owner = personFor(email)
+    if (!owner) continue
+
+    try {
+      // Only members who have actually connected can be read.
+      if (!(await getTokens(email))) {
+        partial.push(email)
+        continue
+      }
+
+      const calendarIds = await listPersonalCalendarIds(email, familyCalendarId)
+      for (const calendarId of calendarIds) {
+        groups.push(
+          toCalendarEvents(await fetchEvents(email, calendarId, from, to), {
+            origin: 'personal',
+            owner,
+            viewer,
+          }),
+        )
+      }
+    } catch (error) {
+      console.error(`Could not read calendars for ${email}:`, error)
+      partial.push(email)
+    }
+  }
+
+  return { events: mergeEvents(groups), partial }
 }
 
 export { GoogleReconnectRequired }

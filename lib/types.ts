@@ -32,6 +32,18 @@ export interface CalendarEvent {
    * the rule on the parent event.
    */
   recurring?: boolean
+  /**
+   * Which calendar this came from. 'family' events are ours to manage;
+   * 'personal' ones are read-only — the app holds only read scope on them and
+   * must never offer to edit or delete something it cannot touch.
+   */
+  origin?: 'family' | 'personal'
+  /**
+   * Details withheld because the event belongs to the other person and is
+   * marked private or confidential. Redaction happens server-side, so the real
+   * title never reaches the browser.
+   */
+  busy?: boolean
 }
 
 export interface Task {

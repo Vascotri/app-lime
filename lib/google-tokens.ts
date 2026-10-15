@@ -21,12 +21,18 @@ export const GOOGLE_SCOPES = [
   // Needed to share the Family calendar with the other person; ACL writes are
   // not covered by calendar.app.created.
   'https://www.googleapis.com/auth/calendar.acls',
+  // Read-only sight of the family's own calendars, so real commitments show up
+  // without anyone having to remember to file them under Family. Read-only is
+  // the ceiling here on purpose: the app can surface a personal event but can
+  // never alter or delete one.
+  'https://www.googleapis.com/auth/calendar.readonly',
 ] as const
 
 /** The calendar scopes that must be present for sync to work. */
 export const REQUIRED_CALENDAR_SCOPES = [
   'https://www.googleapis.com/auth/calendar.app.created',
   'https://www.googleapis.com/auth/calendar.acls',
+  'https://www.googleapis.com/auth/calendar.readonly',
 ] as const
 
 export function hasRequiredScopes(scope: string | null | undefined): boolean {

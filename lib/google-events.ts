@@ -9,9 +9,19 @@ export interface GoogleEvent {
   description?: string
   colorId?: string
   recurringEventId?: string
+  /** 'default' | 'public' | 'private' | 'confidential' */
+  visibility?: string
+  transparency?: string
   start?: { dateTime?: string; date?: string }
   end?: { dateTime?: string; date?: string }
   extendedProperties?: { private?: Record<string, string> }
+}
+
+/** Visibility values that mean "others should see only that I'm busy". */
+const WITHHELD_VISIBILITY = new Set(['private', 'confidential'])
+
+export function isWithheld(event: GoogleEvent): boolean {
+  return WITHHELD_VISIBILITY.has(event.visibility ?? 'default')
 }
 
 /** Keys we own inside extendedProperties.private. */
@@ -82,16 +92,40 @@ export function isAllDay(event: GoogleEvent): boolean {
  * Returns null for anything unrenderable — cancelled events (which Google
  * still returns), and events with no id or start.
  */
-export function toCalendarEvent(event: GoogleEvent): CalendarEvent | null {
+export interface MapOptions {
+  /** Which calendar this came from. */
+  origin?: 'family' | 'personal'
+  /** Whose personal calendar it is — forces the assignee for personal events. */
+  owner?: Person
+  /** The signed-in person the result is being rendered for. */
+  viewer?: Person
+}
+
+export function toCalendarEvent(
+  event: GoogleEvent,
+  options: MapOptions = {},
+): CalendarEvent | null {
   if (event.status === 'cancelled') return null
   if (!event.id) return null
 
   const startAt = toIso(event.start)
   if (!startAt) return null
 
+  const { origin = 'family', owner, viewer } = options
+
+  /*
+   * Redaction. A personal event marked private or confidential belongs to its
+   * owner alone: the other person gets the time slot and nothing else.
+   *
+   * Decided here, server-side, rather than by hiding it in the component —
+   * a withheld title must never be serialised into the page at all, or
+   * "private" is only private until someone opens devtools.
+   */
+  const withheld = origin === 'personal' && !!owner && owner !== viewer && isWithheld(event)
+
   return {
     id: event.id,
-    title: event.summary?.trim() || '(No title)',
+    title: withheld ? 'Busy' : event.summary?.trim() || '(No title)',
     start_at: startAt,
     end_at: toIso(event.end),
     all_day: isAllDay(event),
@@ -100,20 +134,51 @@ export function toCalendarEvent(event: GoogleEvent): CalendarEvent | null {
     // only that this instance belongs to a series.
     recurrence: 'none',
     recurring: !!event.recurringEventId,
-    category: resolveCategory(event),
-    attendees: resolveAssignee(event),
-    notes: event.description?.trim() || null,
+    category: withheld ? 'other' : resolveCategory(event),
+    // A personal event needs no tagging: whose calendar it sits on already
+    // says who it belongs to.
+    attendees: origin === 'personal' && owner ? owner : resolveAssignee(event),
+    notes: withheld ? null : event.description?.trim() || null,
     created_by: '',
     created_at: startAt,
+    origin,
+    busy: withheld || undefined,
   }
 }
 
 /** Map a page of Google events, dropping unrenderable ones, sorted by start. */
-export function toCalendarEvents(events: GoogleEvent[]): CalendarEvent[] {
+export function toCalendarEvents(
+  events: GoogleEvent[],
+  options: MapOptions = {},
+): CalendarEvent[] {
   return events
-    .map(toCalendarEvent)
+    .map((event) => toCalendarEvent(event, options))
     .filter((event): event is CalendarEvent => event !== null)
     .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())
+}
+
+/**
+ * Merge events from several calendars, keeping one copy of each.
+ *
+ * The Family calendar appears in both people's calendar lists once shared, so
+ * without this its events would arrive two or more times. Family wins over a
+ * personal copy of the same id, since that is the editable one.
+ */
+export function mergeEvents(groups: CalendarEvent[][]): CalendarEvent[] {
+  const byId = new Map<string, CalendarEvent>()
+
+  for (const group of groups) {
+    for (const event of group) {
+      const existing = byId.get(event.id)
+      if (!existing || (existing.origin === 'personal' && event.origin === 'family')) {
+        byId.set(event.id, event)
+      }
+    }
+  }
+
+  return [...byId.values()].sort(
+    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
+  )
 }
 
 /** Our metadata, for writing back to Google (used from slice 3). */

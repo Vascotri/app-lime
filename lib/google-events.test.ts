@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toCalendarEvent,
   toCalendarEvents,
+  mergeEvents,
   resolveAssignee,
   resolveCategory,
   toExtendedProperties,
@@ -154,6 +155,117 @@ describe('round trip', () => {
     const event = googleEvent({ extendedProperties: properties })
     expect(resolveAssignee(event)).toBe('jennifer')
     expect(resolveCategory(event)).toBe('kids')
+  })
+})
+
+describe('privacy of personal events', () => {
+  const secret = googleEvent({
+    summary: 'Therapy',
+    description: 'Dr. Silva, 3rd floor',
+    visibility: 'private',
+  })
+
+  it("withholds the other person's private event, leaving only the time", () => {
+    const mapped = toCalendarEvent(secret, {
+      origin: 'personal',
+      owner: 'jennifer',
+      viewer: 'vasco',
+    })!
+
+    expect(mapped.title).toBe('Busy')
+    expect(mapped.busy).toBe(true)
+    // The point of the exercise: nothing identifying may survive.
+    expect(mapped.notes).toBeNull()
+    expect(JSON.stringify(mapped)).not.toContain('Therapy')
+    expect(JSON.stringify(mapped)).not.toContain('Silva')
+    // The slot itself is still shown — that is what "busy" means.
+    expect(mapped.start_at).toBe('2026-10-20T08:30:00.000Z')
+  })
+
+  it('treats confidential the same as private', () => {
+    const mapped = toCalendarEvent(
+      { ...secret, visibility: 'confidential' },
+      { origin: 'personal', owner: 'jennifer', viewer: 'vasco' },
+    )!
+    expect(mapped.title).toBe('Busy')
+  })
+
+  it('shows the owner their own private event in full', () => {
+    const mapped = toCalendarEvent(secret, {
+      origin: 'personal',
+      owner: 'jennifer',
+      viewer: 'jennifer',
+    })!
+    expect(mapped.title).toBe('Therapy')
+    expect(mapped.busy).toBeUndefined()
+  })
+
+  it('leaves ordinary personal events visible to both', () => {
+    // Default visibility is the opt-out: personal events are shared unless
+    // marked otherwise, which is what makes the combined view useful.
+    const mapped = toCalendarEvent(googleEvent({ summary: 'Dentist' }), {
+      origin: 'personal',
+      owner: 'jennifer',
+      viewer: 'vasco',
+    })!
+    expect(mapped.title).toBe('Dentist')
+    expect(mapped.busy).toBeUndefined()
+  })
+
+  it('never withholds a Family event, which is shared by definition', () => {
+    const mapped = toCalendarEvent(
+      { ...secret, summary: 'Anniversary surprise' },
+      { origin: 'family', viewer: 'vasco' },
+    )!
+    expect(mapped.title).toBe('Anniversary surprise')
+  })
+
+  it('assigns a personal event to whoever owns the calendar', () => {
+    // No tagging needed — the calendar it sits on already says who it is for.
+    const mapped = toCalendarEvent(googleEvent(), {
+      origin: 'personal',
+      owner: 'jennifer',
+      viewer: 'vasco',
+    })!
+    expect(mapped.attendees).toBe('jennifer')
+  })
+
+  it('marks personal events as not ours to edit', () => {
+    expect(toCalendarEvent(googleEvent(), { origin: 'personal', owner: 'vasco' })!.origin).toBe(
+      'personal',
+    )
+    expect(toCalendarEvent(googleEvent(), { origin: 'family' })!.origin).toBe('family')
+  })
+})
+
+describe('mergeEvents', () => {
+  const family = toCalendarEvent(googleEvent({ id: 'shared' }), { origin: 'family' })!
+  const personalCopy = toCalendarEvent(googleEvent({ id: 'shared' }), {
+    origin: 'personal',
+    owner: 'vasco',
+  })!
+  const other = toCalendarEvent(googleEvent({ id: 'solo' }), { origin: 'personal', owner: 'vasco' })!
+
+  it('keeps one copy of an event seen on several calendars', () => {
+    // The Family calendar appears in both people's lists once shared.
+    expect(mergeEvents([[family], [personalCopy], [other]])).toHaveLength(2)
+  })
+
+  it('prefers the Family copy, which is the editable one', () => {
+    const merged = mergeEvents([[personalCopy], [family]])
+    expect(merged.find((event) => event.id === 'shared')!.origin).toBe('family')
+  })
+
+  it('returns everything in start order', () => {
+    const early = toCalendarEvent(
+      googleEvent({ id: 'early', start: { dateTime: '2026-10-19T08:00:00Z' } }),
+      { origin: 'family' },
+    )!
+    expect(mergeEvents([[other], [early]]).map((e) => e.id)).toEqual(['early', 'solo'])
+  })
+
+  it('copes with empty groups', () => {
+    expect(mergeEvents([[], []])).toEqual([])
   })
 })
 

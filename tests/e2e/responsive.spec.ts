@@ -247,6 +247,54 @@ test.describe('signed in', () => {
       await expect(page.getByText(/couldn't load your calendar/i)).toHaveCount(0)
     })
 
+    test('a personal event offers no edit or delete the app cannot perform', async ({ page }) => {
+      // Read scope only on personal calendars, so the row must not pretend.
+      await stubEvents(page, 200, [
+        {
+          id: 'personal-1',
+          title: 'Dentist',
+          start_at: '2099-01-01T09:00:00.000Z',
+          end_at: null,
+          all_day: false,
+          recurrence: 'none',
+          category: 'other',
+          attendees: 'jennifer',
+          notes: null,
+          created_by: '',
+          created_at: '2099-01-01T09:00:00.000Z',
+          origin: 'personal',
+        },
+      ])
+      await page.goto('/', { waitUntil: 'networkidle' })
+
+      await expect(page.getByText('Dentist')).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Delete event' })).toHaveCount(0)
+    })
+
+    test("the other person's private event shows as Busy only", async ({ page }) => {
+      await stubEvents(page, 200, [
+        {
+          id: 'private-1',
+          title: 'Busy',
+          start_at: '2099-01-01T09:00:00.000Z',
+          end_at: null,
+          all_day: false,
+          recurrence: 'none',
+          category: 'other',
+          attendees: 'jennifer',
+          notes: null,
+          created_by: '',
+          created_at: '2099-01-01T09:00:00.000Z',
+          origin: 'personal',
+          busy: true,
+        },
+      ])
+      await page.goto('/', { waitUntil: 'networkidle' })
+
+      await expect(page.getByText('Busy')).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Delete event' })).toHaveCount(0)
+    })
+
     test('the error state fits the phone', async ({ page }) => {
       await stubEvents(page, 409, { error: 'reconnect_required' })
       await page.goto('/', { waitUntil: 'networkidle' })
