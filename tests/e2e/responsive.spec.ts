@@ -198,6 +198,63 @@ test.describe('signed in', () => {
     })
   })
 
+  /**
+   * Reading events from Google introduces failure modes Supabase never had.
+   * The one that matters is that none of them may look like "nothing on."
+   */
+  test.describe('calendar failure states', () => {
+    async function stubEvents(page: Page, status: number, body: unknown) {
+      await page.route('**/api/events', (route) =>
+        route.fulfill({
+          status,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        }),
+      )
+    }
+
+    test('an expired Google grant offers a reconnect, not an empty calendar', async ({ page }) => {
+      await stubEvents(page, 409, { error: 'reconnect_required' })
+      await page.goto('/', { waitUntil: 'networkidle' })
+
+      await expect(page.getByText(/needs reconnecting/i)).toBeVisible()
+      await expect(page.getByText(/your events are safe/i)).toBeVisible()
+      await expect(
+        page.getByRole('button', { name: 'Reconnect' }),
+        'an expired grant must be recoverable from the panel itself',
+      ).toBeVisible()
+
+      // The lie we are guarding against.
+      await expect(page.getByText(/no events in the next 14 days/i)).toHaveCount(0)
+    })
+
+    test('an unreachable calendar offers a retry, not an empty calendar', async ({ page }) => {
+      await stubEvents(page, 502, { error: 'calendar_unavailable' })
+      await page.goto('/', { waitUntil: 'networkidle' })
+
+      await expect(page.getByText(/couldn't load your calendar/i)).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
+      await expect(page.getByText(/no events in the next 14 days/i)).toHaveCount(0)
+    })
+
+    test('a genuinely empty calendar still says so', async ({ page }) => {
+      // The counterpart: the empty state must survive, or the error state has
+      // simply replaced one wrong message with another.
+      await stubEvents(page, 200, [])
+      await page.goto('/', { waitUntil: 'networkidle' })
+
+      await expect(page.getByText(/no events in the next 14 days/i)).toBeVisible()
+      await expect(page.getByText(/couldn't load your calendar/i)).toHaveCount(0)
+    })
+
+    test('the error state fits the phone', async ({ page }) => {
+      await stubEvents(page, 409, { error: 'reconnect_required' })
+      await page.goto('/', { waitUntil: 'networkidle' })
+      await assertNoHorizontalOverflow(page, '/ (calendar error)')
+      await assertControlsOnScreen(page)
+    })
+  })
+
   test('a picker records the selection it was given', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: 'Add task' }).click()
