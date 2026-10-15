@@ -3,7 +3,15 @@
 import { useState } from 'react'
 import { format, isToday, isTomorrow, parseISO } from 'date-fns'
 import type { CalendarEvent } from '@/lib/types'
-import { RECURRENCE_LABELS } from '@/lib/types'
+import {
+  RECURRENCE_LABELS,
+  EVENT_CATEGORY_LABELS,
+  EVENT_CATEGORY_BARS,
+  PERSON_LABELS,
+  PERSON_TONES,
+  categoryTone,
+} from '@/lib/types'
+import { Chip } from './Chip'
 import { AddEventModal } from './AddEventModal'
 
 interface Props {
@@ -102,17 +110,35 @@ export function CalendarPanel({ events, loading, onRefresh }: Props) {
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && setEditEvent(ev)}
                 >
-                  <div className="w-1 h-full min-h-[2rem] rounded-full bg-lime-400 flex-shrink-0 mt-0.5" />
+                  <div
+                    className={`w-1 h-full min-h-[2rem] rounded-full flex-shrink-0 mt-0.5 ${
+                      EVENT_CATEGORY_BARS[ev.category] ?? EVENT_CATEGORY_BARS.other
+                    }`}
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{ev.title}</p>
-                    <p className="text-xs text-gray-400">
-                      {ev.all_day
-                        ? 'All day'
-                        : format(parseISO(ev.instance_date ?? ev.start_at), 'h:mm a')}
-                      {ev.recurrence !== 'none' && (
-                        <span className="ml-1.5 text-lime-600">↻ {RECURRENCE_LABELS[ev.recurrence].toLowerCase()}</span>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="text-xs text-gray-400">
+                        {ev.all_day
+                          ? 'All day'
+                          : format(parseISO(ev.instance_date ?? ev.start_at), 'h:mm a')}
+                      </span>
+                      {ev.category && ev.category !== 'other' && (
+                        <Chip
+                          label={EVENT_CATEGORY_LABELS[ev.category]}
+                          tone={categoryTone(ev.category)}
+                        />
                       )}
-                    </p>
+                      <Chip
+                        label={PERSON_LABELS[ev.attendees ?? 'both']}
+                        tone={PERSON_TONES[ev.attendees ?? 'both']}
+                      />
+                      {ev.recurrence !== 'none' && (
+                        <span className="text-xs text-lime-600 whitespace-nowrap">
+                          ↻ {RECURRENCE_LABELS[ev.recurrence].toLowerCase()}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(ev.id) }}

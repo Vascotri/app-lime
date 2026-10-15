@@ -17,6 +17,8 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     end_at: null,
     all_day: false,
     recurrence: 'none',
+    category: 'other',
+    attendees: 'both',
     notes: null,
     created_by: 'test@example.com',
     created_at: '2026-01-01T00:00:00.000Z',

@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { Modal } from './Modal'
-import type { CalendarEvent, Recurrence } from '@/lib/types'
-import { RECURRENCE_LABELS } from '@/lib/types'
+import { Picker } from './Chip'
+import type { CalendarEvent, Recurrence, EventCategory, Attendee } from '@/lib/types'
+import { RECURRENCE_LABELS, EVENT_CATEGORY_LABELS, PERSON_LABELS } from '@/lib/types'
 
 interface Props {
   event?: CalendarEvent | null
@@ -20,6 +21,8 @@ export function AddEventModal({ event, onClose, onSaved }: Props) {
   const [time, setTime] = useState(event?.start_at ? event.start_at.slice(11, 16) : '09:00')
   const [allDay, setAllDay] = useState(event?.all_day ?? false)
   const [recurrence, setRecurrence] = useState<Recurrence>(event?.recurrence ?? 'none')
+  const [category, setCategory] = useState<EventCategory>(event?.category ?? 'other')
+  const [attendees, setAttendees] = useState<Attendee>(event?.attendees ?? 'both')
   const [notes, setNotes] = useState(event?.notes ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -32,7 +35,15 @@ export function AddEventModal({ event, onClose, onSaved }: Props) {
 
     const start_at = allDay ? `${date}T00:00:00.000Z` : `${date}T${time}:00.000Z`
 
-    const payload = { title: title.trim(), start_at, all_day: allDay, recurrence, notes: notes.trim() || null }
+    const payload = {
+      title: title.trim(),
+      start_at,
+      all_day: allDay,
+      recurrence,
+      category,
+      attendees,
+      notes: notes.trim() || null,
+    }
     const url = isEdit ? `/api/events/${event!.id}` : '/api/events'
     const method = isEdit ? 'PATCH' : 'POST'
 
@@ -101,6 +112,22 @@ export function AddEventModal({ event, onClose, onSaved }: Props) {
             </div>
           )}
         </div>
+
+        <Picker
+          label="Who's going?"
+          options={PERSON_LABELS}
+          value={attendees}
+          onChange={setAttendees}
+          columns={3}
+        />
+
+        <Picker
+          label="Category"
+          options={EVENT_CATEGORY_LABELS}
+          value={category}
+          onChange={setCategory}
+          columns={3}
+        />
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Repeat</label>

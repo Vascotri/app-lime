@@ -89,4 +89,73 @@ test.describe('signed in', () => {
       await expect(page.getByRole('button', { name: label })).toBeVisible()
     }
   })
+
+  /**
+   * Modals are the densest screens in the app and the likeliest to overflow a
+   * phone — the event form now carries attendees, category and recurrence on
+   * top of the original fields.
+   */
+  const modals = [
+    {
+      name: 'event',
+      open: 'Add event',
+      heading: 'New event',
+      options: ['Vasco', 'Jennifer', 'Both', 'Home', 'Kids', 'Personal', 'Work', 'Other'],
+    },
+    {
+      name: 'task',
+      open: 'Add task',
+      heading: 'New task',
+      options: ['Vasco', 'Jennifer', 'Both', 'Home', 'Kids', 'Personal', 'Car', 'Dog', 'Travel', 'Gifts', 'Other'],
+    },
+    {
+      name: 'item',
+      open: 'Add item',
+      heading: 'Add item',
+      options: ['Groceries', 'Home', 'Kids', 'Other'],
+    },
+  ]
+
+  for (const modal of modals) {
+    test(`${modal.name} modal fits the phone and offers every option`, async ({ page }) => {
+      await page.goto('/', { waitUntil: 'networkidle' })
+      await page.getByRole('button', { name: modal.open }).click()
+
+      const dialog = page.getByRole('dialog')
+      await expect(dialog).toBeVisible()
+      await expect(page.getByRole('heading', { name: modal.heading })).toBeVisible()
+
+      for (const option of modal.options) {
+        await expect(
+          dialog.getByRole('button', { name: option, exact: true }),
+          `${modal.name} modal is missing the "${option}" option`,
+        ).toBeVisible()
+      }
+
+      await assertNoHorizontalOverflow(page, `/ (${modal.name} modal)`)
+      await assertControlsOnScreen(page)
+
+      // The dialog itself must not exceed the viewport.
+      const box = await dialog.boundingBox()
+      expect(box!.height).toBeLessThanOrEqual(page.viewportSize()!.height)
+    })
+  }
+
+  test('a picker records the selection it was given', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: 'Add task' }).click()
+
+    const dialog = page.getByRole('dialog')
+    const travel = dialog.getByRole('button', { name: 'Travel', exact: true })
+
+    await expect(travel).toHaveAttribute('aria-pressed', 'false')
+    await travel.click()
+    await expect(travel).toHaveAttribute('aria-pressed', 'true')
+
+    // Selecting one option clears the previous one.
+    const car = dialog.getByRole('button', { name: 'Car', exact: true })
+    await car.click()
+    await expect(car).toHaveAttribute('aria-pressed', 'true')
+    await expect(travel).toHaveAttribute('aria-pressed', 'false')
+  })
 })

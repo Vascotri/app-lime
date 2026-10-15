@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       title: body.title,
       description: body.description ?? null,
       assigned_to: body.assigned_to ?? 'both',
+      category: body.category ?? 'other',
       due_date: body.due_date ?? null,
       created_by: session.user?.email,
     })

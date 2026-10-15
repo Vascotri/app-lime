@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { Modal } from './Modal'
-import type { Task, Assignee } from '@/lib/types'
-import { ASSIGNEE_LABELS } from '@/lib/types'
+import { Picker } from './Chip'
+import type { Task, Assignee, TaskCategory } from '@/lib/types'
+import { PERSON_LABELS, TASK_CATEGORY_LABELS } from '@/lib/types'
 
 interface Props {
   task?: Task | null
@@ -16,6 +17,7 @@ export function AddTaskModal({ task, onClose, onSaved }: Props) {
   const [title, setTitle] = useState(task?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
   const [assignedTo, setAssignedTo] = useState<Assignee>(task?.assigned_to ?? 'both')
+  const [category, setCategory] = useState<TaskCategory>(task?.category ?? 'other')
   const [dueDate, setDueDate] = useState(task?.due_date ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -30,6 +32,7 @@ export function AddTaskModal({ task, onClose, onSaved }: Props) {
       title: title.trim(),
       description: description.trim() || null,
       assigned_to: assignedTo,
+      category,
       due_date: dueDate || null,
     }
     const url = isEdit ? `/api/tasks/${task!.id}` : '/api/tasks'
@@ -78,25 +81,21 @@ export function AddTaskModal({ task, onClose, onSaved }: Props) {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Assign to</label>
-          <div className="flex gap-2">
-            {(Object.entries(ASSIGNEE_LABELS) as [Assignee, string][]).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setAssignedTo(value)}
-                className={`flex-1 rounded-lg border py-2 text-sm font-medium transition-colors ${
-                  assignedTo === value
-                    ? 'border-lime-500 bg-lime-50 text-lime-700'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Picker
+          label="Assign to"
+          options={PERSON_LABELS}
+          value={assignedTo}
+          onChange={setAssignedTo}
+          columns={3}
+        />
+
+        <Picker
+          label="Category"
+          options={TASK_CATEGORY_LABELS}
+          value={category}
+          onChange={setCategory}
+          columns={4}
+        />
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Due date</label>

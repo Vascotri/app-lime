@@ -3,19 +3,19 @@
 import { useState } from 'react'
 import { format, isPast, parseISO, isToday } from 'date-fns'
 import type { Task } from '@/lib/types'
-import { ASSIGNEE_LABELS } from '@/lib/types'
+import {
+  PERSON_LABELS,
+  PERSON_TONES,
+  TASK_CATEGORY_LABELS,
+  categoryTone,
+} from '@/lib/types'
+import { Chip } from './Chip'
 import { AddTaskModal } from './AddTaskModal'
 
 interface Props {
   tasks: Task[]
   loading: boolean
   onRefresh: () => void
-}
-
-const ASSIGNEE_COLORS = {
-  vasco: 'bg-blue-100 text-blue-700',
-  jennifer: 'bg-purple-100 text-purple-700',
-  both: 'bg-gray-100 text-gray-600',
 }
 
 export function TasksPanel({ tasks, loading, onRefresh }: Props) {
@@ -64,9 +64,16 @@ export function TasksPanel({ tasks, loading, onRefresh }: Props) {
         >
           <p className="text-sm font-medium text-gray-800 truncate">{task.title}</p>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${ASSIGNEE_COLORS[task.assigned_to]}`}>
-              {ASSIGNEE_LABELS[task.assigned_to]}
-            </span>
+            <Chip
+              label={PERSON_LABELS[task.assigned_to]}
+              tone={PERSON_TONES[task.assigned_to]}
+            />
+            {task.category && task.category !== 'other' && (
+              <Chip
+                label={TASK_CATEGORY_LABELS[task.category]}
+                tone={categoryTone(task.category)}
+              />
+            )}
             {task.due_date && (
               <span className={`text-xs ${
                 overdue.includes(task) ? 'text-red-500 font-medium' :

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import type { ShoppingItem, Category } from '@/lib/types'
-import { CATEGORY_LABELS } from '@/lib/types'
+import type { ShoppingItem, ShoppingCategory } from '@/lib/types'
+import { SHOPPING_CATEGORY_LABELS } from '@/lib/types'
 import { AddItemModal } from './AddItemModal'
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
   onRefresh: () => void
 }
 
-const CATEGORY_ICONS: Record<Category, string> = {
+const CATEGORY_ICONS: Record<ShoppingCategory, string> = {
   groceries: '🛒',
   home: '🏠',
   kids: '🧒',
@@ -39,10 +39,10 @@ export function ShoppingPanel({ items, loading, onRefresh }: Props) {
     onRefresh()
   }
 
-  function groupByCategory(list: ShoppingItem[]): Map<Category, ShoppingItem[]> {
-    const map = new Map<Category, ShoppingItem[]>()
+  function groupByCategory(list: ShoppingItem[]): Map<ShoppingCategory, ShoppingItem[]> {
+    const map = new Map<ShoppingCategory, ShoppingItem[]>()
     for (const item of list) {
-      const cat = item.category as Category
+      const cat = item.category as ShoppingCategory
       if (!map.has(cat)) map.set(cat, [])
       map.get(cat)!.push(item)
     }
@@ -50,7 +50,7 @@ export function ShoppingPanel({ items, loading, onRefresh }: Props) {
   }
 
   const grouped = groupByCategory(unchecked)
-  const categories = (Object.keys(CATEGORY_LABELS) as Category[]).filter((c) => grouped.has(c))
+  const categories = (Object.keys(SHOPPING_CATEGORY_LABELS) as ShoppingCategory[]).filter((c) => grouped.has(c))
 
   return (
     <div className="bg-white rounded-2xl border border-lime-100 shadow-sm flex flex-col min-h-0">
@@ -101,7 +101,7 @@ export function ShoppingPanel({ items, loading, onRefresh }: Props) {
           <div key={cat}>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 px-1 flex items-center gap-1">
               <span>{CATEGORY_ICONS[cat]}</span>
-              {CATEGORY_LABELS[cat]}
+              {SHOPPING_CATEGORY_LABELS[cat]}
               <span className="text-gray-300">({grouped.get(cat)!.length})</span>
             </p>
             <div className="space-y-0.5">
