@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   EVENT_CATEGORY_LABELS,
@@ -80,14 +80,32 @@ describe('schema.sql matches the TypeScript unions', () => {
   }
 })
 
-describe('the migration lands on the same values as a fresh schema', () => {
-  const migration = migrationConstraints(
-    readSql('supabase', 'migrations', '001_add_categories_and_attendees.sql'),
-  )
+describe('the migrations land on the same values as a fresh schema', () => {
+  /*
+   * Every migration, applied in filename order, so a later one that widens a
+   * constraint supersedes the earlier definition — exactly as it would in the
+   * database. Reading only the first migration would quietly stop checking
+   * any column introduced or changed afterwards.
+   */
+  const migration = readdirSync(join(root, 'supabase', 'migrations'))
+    .filter((file) => file.endsWith('.sql'))
+    .sort()
+    .reduce<Record<string, string[]>>(
+      (merged, file) => ({
+        ...merged,
+        ...migrationConstraints(readSql('supabase', 'migrations', file)),
+      }),
+      {},
+    )
 
   // An existing project is migrated; a new one is created from schema.sql.
   // The two must agree or the app behaves differently against each.
-  const columns = ['tasks.category', 'events.category', 'events.attendees']
+  const columns = [
+    'tasks.category',
+    'events.category',
+    'events.attendees',
+    'shopping_items.category',
+  ]
 
   for (const key of columns) {
     it(key, () => {

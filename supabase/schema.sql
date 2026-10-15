@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS shopping_items (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name       TEXT NOT NULL,
   category   TEXT NOT NULL DEFAULT 'other'
-             CHECK (category IN ('groceries','home','kids','other')),
+             CHECK (category IN ('groceries','home','kids','pharmacy','gifts','dog','other')),
   quantity   TEXT,
   checked_at TIMESTAMPTZ,
   added_by   TEXT NOT NULL,

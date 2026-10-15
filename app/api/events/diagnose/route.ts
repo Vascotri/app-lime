@@ -7,9 +7,8 @@ import { listEvents, CALENDAR_NAME } from '@/lib/google-calendar'
 import { getTokens, hasRequiredScopes } from '@/lib/google-tokens'
 import { getSetting, FAMILY_CALENDAR_ID } from '@/lib/settings'
 import { resolveSource } from '@/lib/calendar-source'
+import { agendaWindow, WINDOW_DAYS } from '@/lib/calendar-window'
 import type { CalendarEvent } from '@/lib/types'
-
-const WINDOW_DAYS = 14
 
 /**
  * Side-by-side comparison of both event sources.
@@ -30,10 +29,7 @@ export async function GET() {
   }
   const email = session.user.email
 
-  const from = new Date()
-  from.setHours(0, 0, 0, 0)
-  const to = new Date(from)
-  to.setDate(to.getDate() + WINDOW_DAYS)
+  const { from, to } = agendaWindow()
 
   // --- Supabase -----------------------------------------------------------
   let supabaseReport: Record<string, unknown>

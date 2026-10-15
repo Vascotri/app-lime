@@ -13,6 +13,7 @@ import {
   categoryTone,
 } from '@/lib/types'
 import { Chip } from './Chip'
+import { groupByAgendaDay, todayKey, isOngoing } from '@/lib/agenda'
 import { AddEventModal } from './AddEventModal'
 
 interface Props {
@@ -29,15 +30,6 @@ function dayLabel(dateStr: string): string {
   return format(d, 'EEEE, d MMM')
 }
 
-function groupByDay(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
-  const map = new Map<string, CalendarEvent[]>()
-  for (const ev of events) {
-    const key = (ev.instance_date ?? ev.start_at).slice(0, 10)
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(ev)
-  }
-  return map
-}
 
 export function CalendarPanel({ events, loading, error, onRefresh }: Props) {
   const [showAdd, setShowAdd] = useState(false)
@@ -49,7 +41,8 @@ export function CalendarPanel({ events, loading, error, onRefresh }: Props) {
     onRefresh()
   }
 
-  const grouped = groupByDay(events)
+  const today = todayKey()
+  const grouped = groupByAgendaDay(events, today)
   const days = [...grouped.keys()].sort()
 
   return (
@@ -169,9 +162,11 @@ export function CalendarPanel({ events, loading, error, onRefresh }: Props) {
                     </p>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                       <span className="text-xs text-gray-400">
-                        {ev.all_day
-                          ? 'All day'
-                          : format(parseISO(ev.instance_date ?? ev.start_at), 'h:mm a')}
+                        {isOngoing(ev, today)
+                          ? `Since ${format(parseISO(ev.instance_date ?? ev.start_at), 'd MMM')}`
+                          : ev.all_day
+                            ? 'All day'
+                            : format(parseISO(ev.instance_date ?? ev.start_at), 'h:mm a')}
                       </span>
                       {ev.category && ev.category !== 'other' && (
                         <Chip

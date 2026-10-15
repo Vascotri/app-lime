@@ -5,7 +5,8 @@ export type Person = 'vasco' | 'jennifer' | 'both'
 export type Assignee = Person
 export type Attendee = Person
 
-export type ShoppingCategory = 'groceries' | 'home' | 'kids' | 'other'
+export type ShoppingCategory =
+  | 'groceries' | 'home' | 'kids' | 'pharmacy' | 'gifts' | 'dog' | 'other'
 
 export type TaskCategory =
   | 'home' | 'kids' | 'personal' | 'car' | 'dog' | 'travel' | 'gifts' | 'other'
@@ -77,6 +78,9 @@ export const SHOPPING_CATEGORY_LABELS: Record<ShoppingCategory, string> = {
   groceries: 'Groceries',
   home: 'Home',
   kids: 'Kids',
+  pharmacy: 'Pharmacy',
+  gifts: 'Gifts',
+  dog: 'Dog',
   other: 'Other',
 }
 
