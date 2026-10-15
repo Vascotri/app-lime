@@ -1,4 +1,4 @@
-import type { CalendarEvent, Person, EventCategory } from './types'
+import type { CalendarEvent, Person, EventCategory, Recurrence } from './types'
 import { PERSON_LABELS, EVENT_CATEGORY_LABELS, PERSON_GOOGLE_COLOR_IDS } from './types'
 
 /** The slice of Google's event resource we actually consume. */
@@ -181,10 +181,108 @@ export function mergeEvents(groups: CalendarEvent[][]): CalendarEvent[] {
   )
 }
 
-/** Our metadata, for writing back to Google (used from slice 3). */
+/** Our metadata, written alongside every event we create. */
 export function toExtendedProperties(
   attendees: Person,
   category: EventCategory,
 ): { private: Record<string, string> } {
   return { private: { [ASSIGNEE_KEY]: attendees, [CATEGORY_KEY]: category } }
+}
+
+/* ---------------------------------------------------------------- writing */
+
+const RRULES: Record<Recurrence, string | null> = {
+  none: null,
+  daily: 'RRULE:FREQ=DAILY',
+  weekdays: 'RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+  weekly: 'RRULE:FREQ=WEEKLY',
+  monthly: 'RRULE:FREQ=MONTHLY',
+  yearly: 'RRULE:FREQ=YEARLY',
+}
+
+/** Our repeat options as the RFC 5545 rules Google expects. */
+export function toRRule(recurrence: Recurrence): string[] {
+  const rule = RRULES[recurrence]
+  return rule ? [rule] : []
+}
+
+/**
+ * Read one of our own rules back.
+ *
+ * Only recognises rules this app writes; anything authored in Google Calendar
+ * ("every 3rd Tuesday until June") has no equivalent here and comes back as
+ * 'none' rather than being flattened into a near-miss. Google still expands
+ * such a series correctly — we just can't offer to edit the rule.
+ */
+export function fromRRule(rules: string[] | undefined): Recurrence {
+  if (!rules?.length) return 'none'
+  const normalised = rules.map((rule) => rule.trim().toUpperCase())
+  for (const [recurrence, rule] of Object.entries(RRULES) as [Recurrence, string | null][]) {
+    if (rule && normalised.includes(rule)) return recurrence
+  }
+  return 'none'
+}
+
+/** A naive local datetime, "YYYY-MM-DDTHH:mm:ss", with no zone attached. */
+function addHours(local: string, hours: number): string {
+  const date = new Date(`${local}Z`)
+  date.setUTCHours(date.getUTCHours() + hours)
+  return date.toISOString().slice(0, 19)
+}
+
+function addDays(date: string, days: number): string {
+  const parsed = new Date(`${date}T00:00:00Z`)
+  parsed.setUTCDate(parsed.getUTCDate() + days)
+  return parsed.toISOString().slice(0, 10)
+}
+
+export interface EventInput {
+  title: string
+  /** Wall-clock time as typed: "YYYY-MM-DD" when all-day, else with a time. */
+  start_local: string
+  all_day: boolean
+  recurrence: Recurrence
+  category: EventCategory
+  attendees: Person
+  notes: string | null
+}
+
+/**
+ * Build the Google event body for a create or update.
+ *
+ * Times are sent as wall-clock plus an explicit timeZone rather than as a UTC
+ * instant. "09:00" means nine o'clock here, and letting Google resolve that
+ * against the calendar's zone keeps it nine o'clock across a DST boundary
+ * instead of drifting by an hour.
+ *
+ * Google requires an end; the form only asks for a start, so a timed event
+ * gets an hour and an all-day event one day. All-day end dates are exclusive,
+ * hence the +1.
+ *
+ * The assignee is written twice on purpose: to extendedProperties, which is
+ * authoritative and survives, and to colorId, which is the only part Google
+ * Calendar actually shows.
+ */
+export function toGoogleEventBody(
+  input: EventInput,
+  timeZone: string,
+): Record<string, unknown> {
+  const base = {
+    summary: input.title,
+    description: input.notes ?? '',
+    colorId: PERSON_GOOGLE_COLOR_IDS[input.attendees],
+    extendedProperties: toExtendedProperties(input.attendees, input.category),
+    recurrence: toRRule(input.recurrence),
+  }
+
+  if (input.all_day) {
+    const start = input.start_local.slice(0, 10)
+    return { ...base, start: { date: start }, end: { date: addDays(start, 1) } }
+  }
+
+  return {
+    ...base,
+    start: { dateTime: input.start_local, timeZone },
+    end: { dateTime: addHours(input.start_local, 1), timeZone },
+  }
 }

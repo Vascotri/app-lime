@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Modal } from './Modal'
 import { Picker } from './Chip'
 import type { ShoppingCategory } from '@/lib/types'
@@ -12,6 +12,7 @@ interface Props {
 }
 
 export function AddItemModal({ onClose, onSaved }: Props) {
+  const uid = useId()
   const [name, setName] = useState('')
   const [category, setCategory] = useState<ShoppingCategory>('groceries')
   const [quantity, setQuantity] = useState('')
@@ -45,12 +46,13 @@ export function AddItemModal({ onClose, onSaved }: Props) {
         {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Item *</label>
+          <label htmlFor={`${uid}-item`} className="block text-sm font-medium text-gray-700 mb-1">Item *</label>
           <input
             autoFocus
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            id={`${uid}-item`}
             placeholder="e.g. Milk"
             className="w-full rounded-lg border-gray-200 text-sm py-2.5"
           />
@@ -65,11 +67,12 @@ export function AddItemModal({ onClose, onSaved }: Props) {
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+          <label htmlFor={`${uid}-quantity`} className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
           <input
             type="text"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
+            id={`${uid}-quantity`}
             placeholder="e.g. 2 packs, 1 litre…"
             className="w-full rounded-lg border-gray-200 text-sm py-2.5"
           />

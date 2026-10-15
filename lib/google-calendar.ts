@@ -1,6 +1,13 @@
 import { getAccessToken, GoogleReconnectRequired } from './google-tokens'
 import { getSetting, setSetting, FAMILY_CALENDAR_ID } from './settings'
-import { toCalendarEvents, mergeEvents, type GoogleEvent } from './google-events'
+import {
+  toCalendarEvents,
+  toCalendarEvent,
+  mergeEvents,
+  toGoogleEventBody,
+  type GoogleEvent,
+  type EventInput,
+} from './google-events'
 import { ALLOWED_EMAILS, EMAIL_TO_NAME } from './types'
 import type { CalendarEvent, Person } from './types'
 import { getTokens } from './google-tokens'
@@ -252,6 +259,57 @@ export async function listAllEvents(
   }
 
   return { events: mergeEvents(groups), partial }
+}
+
+/* ---------------------------------------------------------------- writing */
+
+/*
+ * Every write addresses the Family calendar explicitly and never takes a
+ * calendar id from the caller. That is the structural reason a bug here
+ * cannot touch a real work meeting: we hold no write scope on personal
+ * calendars, and the code has no way to name one.
+ */
+
+export async function createEvent(email: string, input: EventInput): Promise<CalendarEvent> {
+  const calendarId = await ensureFamilyCalendar(email)
+
+  const created = (await googleFetch(
+    email,
+    `/calendars/${encodeURIComponent(calendarId)}/events`,
+    { method: 'POST', body: JSON.stringify(toGoogleEventBody(input, CALENDAR_TIMEZONE)) },
+  )) as GoogleEvent
+
+  const mapped = toCalendarEvent(created, { origin: 'family' })
+  if (!mapped) throw new Error('Google returned an event we could not read back.')
+  return mapped
+}
+
+export async function updateEvent(
+  email: string,
+  eventId: string,
+  input: EventInput,
+): Promise<CalendarEvent> {
+  const calendarId = await ensureFamilyCalendar(email)
+
+  const updated = (await googleFetch(
+    email,
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    { method: 'PATCH', body: JSON.stringify(toGoogleEventBody(input, CALENDAR_TIMEZONE)) },
+  )) as GoogleEvent
+
+  const mapped = toCalendarEvent(updated, { origin: 'family' })
+  if (!mapped) throw new Error('Google returned an event we could not read back.')
+  return mapped
+}
+
+export async function deleteEvent(email: string, eventId: string): Promise<void> {
+  const calendarId = await ensureFamilyCalendar(email)
+
+  await googleFetch(
+    email,
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    { method: 'DELETE' },
+  )
 }
 
 export { GoogleReconnectRequired }

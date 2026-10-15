@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Modal } from './Modal'
 import { Picker } from './Chip'
 import type { Task, Assignee, TaskCategory } from '@/lib/types'
@@ -14,6 +14,7 @@ interface Props {
 
 export function AddTaskModal({ task, onClose, onSaved }: Props) {
   const isEdit = !!task
+  const uid = useId()
   const [title, setTitle] = useState(task?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
   const [assignedTo, setAssignedTo] = useState<Assignee>(task?.assigned_to ?? 'both')
@@ -59,20 +60,22 @@ export function AddTaskModal({ task, onClose, onSaved }: Props) {
         {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+          <label htmlFor={`${uid}-title`} className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
           <input
             autoFocus
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            id={`${uid}-title`}
             placeholder="e.g. Book dentist appointment"
             className="w-full rounded-lg border-gray-200 text-sm py-2.5"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <label htmlFor={`${uid}-description`} className="block text-sm font-medium text-gray-700 mb-1">Description</label>
           <textarea
+            id={`${uid}-description`}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
@@ -98,10 +101,11 @@ export function AddTaskModal({ task, onClose, onSaved }: Props) {
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Due date</label>
+          <label htmlFor={`${uid}-due`} className="block text-sm font-medium text-gray-700 mb-1">Due date</label>
           <input
             type="date"
             value={dueDate}
+            id={`${uid}-due`}
             onChange={(e) => setDueDate(e.target.value)}
             className="w-full rounded-lg border-gray-200 text-sm py-2.5"
           />
