@@ -139,14 +139,20 @@ export function CalendarPanel({ events, loading, error, onRefresh }: Props) {
               {dayLabel(day)}
             </p>
             <div className="space-y-1">
-              {grouped.get(day)!.map((ev) => (
+              {grouped.get(day)!.map((ev) => {
+                // We hold read scope only on personal calendars, so offering
+                // edit or delete here would promise something that cannot work.
+                const editable = ev.origin !== 'personal'
+                return (
                 <div
                   key={`${ev.id}-${ev.instance_date ?? ev.start_at}`}
-                  className="group flex items-start gap-2.5 rounded-xl px-3 py-2.5 hover:bg-lime-50 transition-colors cursor-pointer"
-                  onClick={() => setEditEvent(ev)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && setEditEvent(ev)}
+                  className={`group flex items-start gap-2.5 rounded-xl px-3 py-2.5 transition-colors ${
+                    editable ? 'hover:bg-lime-50 cursor-pointer' : 'cursor-default'
+                  }`}
+                  onClick={editable ? () => setEditEvent(ev) : undefined}
+                  role={editable ? 'button' : undefined}
+                  tabIndex={editable ? 0 : undefined}
+                  onKeyDown={editable ? (e) => e.key === 'Enter' && setEditEvent(ev) : undefined}
                 >
                   <div
                     className={`w-1 h-full min-h-[2rem] rounded-full flex-shrink-0 mt-0.5 ${
@@ -154,7 +160,13 @@ export function CalendarPanel({ events, loading, error, onRefresh }: Props) {
                     }`}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{ev.title}</p>
+                    <p
+                      className={`text-sm font-medium truncate ${
+                        ev.busy ? 'text-gray-400 italic' : 'text-gray-800'
+                      }`}
+                    >
+                      {ev.title}
+                    </p>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                       <span className="text-xs text-gray-400">
                         {ev.all_day
@@ -185,15 +197,18 @@ export function CalendarPanel({ events, loading, error, onRefresh }: Props) {
                       ) : null}
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(ev.id) }}
-                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs w-6 h-6 flex items-center justify-center rounded transition-all flex-shrink-0"
-                    aria-label="Delete event"
-                  >
-                    ✕
-                  </button>
+                  {editable && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(ev.id) }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs w-6 h-6 flex items-center justify-center rounded transition-all flex-shrink-0"
+                      aria-label="Delete event"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         ))}

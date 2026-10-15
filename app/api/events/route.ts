@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getSupabase } from '@/lib/supabase'
 import { expandEvent } from '@/lib/recurrence'
-import { listEvents, GoogleReconnectRequired } from '@/lib/google-calendar'
+import { listAllEvents, GoogleReconnectRequired } from '@/lib/google-calendar'
 import { resolveSource } from '@/lib/calendar-source'
 import type { CalendarEvent } from '@/lib/types'
 
@@ -29,8 +29,15 @@ export async function GET(request: Request) {
 
   if (source === 'google') {
     try {
-      const events = await listEvents(session.user.email, from, to)
-      return NextResponse.json(events, { headers: { 'X-Calendar-Source': 'google' } })
+      const { events, partial } = await listAllEvents(session.user.email, from, to)
+      return NextResponse.json(events, {
+        headers: {
+          'X-Calendar-Source': 'google',
+          // Names whoever's calendars could not be read, so a half-complete
+          // day is distinguishable from a quiet one.
+          ...(partial.length ? { 'X-Calendar-Partial': partial.join(',') } : {}),
+        },
+      })
     } catch (error) {
       if (error instanceof GoogleReconnectRequired) {
         // 409, not 401: the session is fine, it's the Google grant that isn't.

@@ -15,11 +15,22 @@ describe('requested scopes', () => {
     }
   })
 
-  it('does not request blanket calendar access', () => {
-    // calendar.app.created limits the app to calendars it made. The plain
-    // `calendar` scope would expose every calendar the user owns.
+  it('never requests write access to calendars it did not create', () => {
+    /*
+     * The boundary, deliberately: the app may READ every calendar — that is
+     * what lets personal commitments appear without anyone filing them under
+     * Family — but may only WRITE to the calendar it made itself.
+     *
+     * The plain `calendar` scope is read-write over everything. Granting it
+     * would let a bug in the write path modify or delete a real work meeting,
+     * so it stays out even though it would subsume the three we do ask for.
+     */
     expect(GOOGLE_SCOPES).not.toContain('https://www.googleapis.com/auth/calendar')
-    expect(GOOGLE_SCOPES).not.toContain('https://www.googleapis.com/auth/calendar.readonly')
+    expect(GOOGLE_SCOPES).not.toContain('https://www.googleapis.com/auth/calendar.events')
+
+    // Read of everything is in scope; write is confined to app.created.
+    expect(GOOGLE_SCOPES).toContain('https://www.googleapis.com/auth/calendar.readonly')
+    expect(GOOGLE_SCOPES).toContain('https://www.googleapis.com/auth/calendar.app.created')
   })
 })
 
