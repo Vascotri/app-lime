@@ -132,6 +132,25 @@ test.describe('signed in', () => {
         ).toBeVisible()
       }
 
+      /*
+       * Every input must be reachable by its visible name. These labels sat
+       * beside their controls with nothing connecting them, so a screen reader
+       * announced "edit text, blank" for the whole form.
+       */
+      const unlabelled = await dialog.evaluate((root) => {
+        const bad: string[] = []
+        for (const field of Array.from(root.querySelectorAll('input, select, textarea'))) {
+          const id = field.getAttribute('id')
+          const named =
+            (id && root.ownerDocument.querySelector(`label[for="${CSS.escape(id)}"]`)) ||
+            field.getAttribute('aria-label') ||
+            field.closest('label')
+          if (!named) bad.push(field.getAttribute('type') ?? field.tagName.toLowerCase())
+        }
+        return bad
+      })
+      expect(unlabelled, `unlabelled controls in the ${modal.name} modal`).toEqual([])
+
       await assertNoHorizontalOverflow(page, `/ (${modal.name} modal)`)
       await assertControlsOnScreen(page)
 
@@ -301,6 +320,69 @@ test.describe('signed in', () => {
       await assertNoHorizontalOverflow(page, '/ (calendar error)')
       await assertControlsOnScreen(page)
     })
+  })
+
+  test('a new event is sent as wall-clock time, not a UTC instant', async ({ page }) => {
+    /*
+     * Regression: the form used to stamp a "Z" onto the time typed, so 09:00
+     * was saved as 09:00 UTC — an hour out in Lisbon, and wrong by a varying
+     * amount anywhere else. It must send the time as typed.
+     */
+    await page.goto('/', { waitUntil: 'networkidle' })
+
+    let body: Record<string, unknown> | undefined
+    await page.route('**/api/events', async (route) => {
+      if (route.request().method() === 'POST') {
+        body = route.request().postDataJSON()
+        return route.fulfill({ status: 201, contentType: 'application/json', body: '{}' })
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+
+    await page.getByRole('button', { name: 'Add event' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByPlaceholder('e.g. Dinner with family').fill('Swimming')
+    await dialog.getByRole('button', { name: 'Jennifer', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Kids', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Add event' }).click()
+
+    await expect.poll(() => body?.title).toBe('Swimming')
+    expect(body!.start_local, 'wall-clock time must not carry a Z').not.toContain('Z')
+    expect(body!.start_local).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
+    expect(body!.attendees).toBe('jennifer')
+    expect(body!.category).toBe('kids')
+  })
+
+  test('one occurrence of a series cannot pretend to edit the rule', async ({ page }) => {
+    await page.route('**/api/events', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'inst-1',
+            title: 'School run',
+            start_at: '2099-01-01T08:30:00.000Z',
+            end_at: null,
+            all_day: false,
+            recurrence: 'none',
+            recurring: true,
+            category: 'kids',
+            attendees: 'vasco',
+            notes: null,
+            created_by: '',
+            created_at: '2099-01-01T08:30:00.000Z',
+            origin: 'family',
+          },
+        ]),
+      }),
+    )
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByText('School run').click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText(/changes apply to this date only/i)).toBeVisible()
+    await expect(dialog.getByLabel('Repeat')).toBeDisabled()
   })
 
   test('a picker records the selection it was given', async ({ page }) => {

@@ -32,8 +32,10 @@ export function Picker<T extends string>({
     columns === 2 ? 'grid-cols-2' : columns === 4 ? 'grid-cols-4' : 'grid-cols-3'
 
   return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    // A fieldset/legend names the whole group for a screen reader. A bare
+    // <label> cannot: it points at one control, and this is a set of them.
+    <fieldset>
+      <legend className="block text-sm font-medium text-gray-700 mb-1">{label}</legend>
       <div className={`grid ${gridClass} gap-2`}>
         {(Object.entries(options) as [T, string][]).map(([optionValue, optionLabel]) => (
           <button
@@ -51,6 +53,6 @@ export function Picker<T extends string>({
           </button>
         ))}
       </div>
-    </div>
+    </fieldset>
   )
 }

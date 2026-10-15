@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getSupabase } from '@/lib/supabase'
 import { expandEvent } from '@/lib/recurrence'
-import { listAllEvents, GoogleReconnectRequired } from '@/lib/google-calendar'
+import { listAllEvents, createEvent, GoogleReconnectRequired } from '@/lib/google-calendar'
+import { parseEventInput, googleErrorResponse } from '@/lib/event-input'
 import { resolveSource } from '@/lib/calendar-source'
 import { agendaWindow } from '@/lib/calendar-window'
 import type { CalendarEvent } from '@/lib/types'
@@ -62,9 +63,24 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const body = await request.json()
+  const source = resolveSource(new URL(request.url).searchParams.get('source'))
+
+  if (source === 'google') {
+    const input = parseEventInput(body)
+    if ('error' in input) return NextResponse.json(input, { status: 400 })
+
+    try {
+      return NextResponse.json(await createEvent(session.user.email, input), { status: 201 })
+    } catch (error) {
+      return googleErrorResponse(error, 'create')
+    }
+  }
+
   const { data, error } = await getSupabase()
     .from('events')
     .insert({
