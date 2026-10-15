@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { format, isPast, parseISO, isToday } from 'date-fns'
+import { useMemo, useState } from 'react'
+import { format, parseISO, isToday } from 'date-fns'
 import type { Task } from '@/lib/types'
 import {
   PERSON_LABELS,
@@ -9,7 +9,18 @@ import {
   TASK_CATEGORY_LABELS,
   categoryTone,
 } from '@/lib/types'
+import {
+  filterTasks,
+  groupTasks,
+  hasActiveFilters,
+  isOverdue,
+  isDueToday,
+  NO_FILTERS,
+  type TaskFilters,
+  type TaskGrouping,
+} from '@/lib/task-view'
 import { Chip } from './Chip'
+import { TaskFilterBar } from './TaskFilterBar'
 import { AddTaskModal } from './AddTaskModal'
 
 interface Props {
@@ -21,14 +32,13 @@ interface Props {
 export function TasksPanel({ tasks, loading, onRefresh }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [editTask, setEditTask] = useState<Task | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState<TaskFilters>(NO_FILTERS)
+  const [grouping, setGrouping] = useState<TaskGrouping>('due')
 
-  const overdue = tasks.filter(
-    (t) => t.due_date && isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)),
-  )
-  const dueToday = tasks.filter((t) => t.due_date && isToday(parseISO(t.due_date)))
-  const upcoming = tasks.filter(
-    (t) => !t.due_date || (!isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date))),
-  )
+  const visible = useMemo(() => filterTasks(tasks, filters), [tasks, filters])
+  const groups = useMemo(() => groupTasks(visible, grouping), [visible, grouping])
+  const filtered = hasActiveFilters(filters)
 
   async function toggleComplete(task: Task) {
     await fetch(`/api/tasks/${task.id}`, {
@@ -76,8 +86,8 @@ export function TasksPanel({ tasks, loading, onRefresh }: Props) {
             )}
             {task.due_date && (
               <span className={`text-xs ${
-                overdue.includes(task) ? 'text-red-500 font-medium' :
-                dueToday.includes(task) ? 'text-amber-600 font-medium' :
+                isOverdue(task) ? 'text-red-500 font-medium' :
+                isDueToday(task) ? 'text-amber-600 font-medium' :
                 'text-gray-400'
               }`}>
                 {isToday(parseISO(task.due_date)) ? 'Due today' : format(parseISO(task.due_date), 'd MMM')}
@@ -96,18 +106,6 @@ export function TasksPanel({ tasks, loading, onRefresh }: Props) {
     )
   }
 
-  function Section({ label, items, accent }: { label: string; items: Task[]; accent?: string }) {
-    if (items.length === 0) return null
-    return (
-      <div>
-        <p className={`text-xs font-semibold uppercase tracking-wide mb-1.5 px-1 ${accent ?? 'text-gray-400'}`}>
-          {label} ({items.length})
-        </p>
-        {items.map((t) => <TaskRow key={t.id} task={t} />)}
-      </div>
-    )
-  }
-
   return (
     <div className="bg-white rounded-2xl border border-lime-100 shadow-sm flex flex-col min-h-0">
       {/* Header */}
@@ -117,18 +115,48 @@ export function TasksPanel({ tasks, loading, onRefresh }: Props) {
           <h2 className="text-sm font-semibold text-gray-800">Tasks</h2>
           {!loading && tasks.length > 0 && (
             <span className="text-xs bg-lime-100 text-lime-700 rounded-full px-2 py-0.5 font-medium">
-              {tasks.length}
+              {filtered ? `${visible.length}/${tasks.length}` : tasks.length}
             </span>
           )}
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="w-7 h-7 flex items-center justify-center rounded-full bg-lime-500 text-white text-lg leading-none hover:bg-lime-600 transition-colors"
-          aria-label="Add task"
-        >
-          +
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowFilters((open) => !open)}
+            aria-expanded={showFilters}
+            aria-label={showFilters ? 'Hide filters' : 'Show filters'}
+            className={`relative w-7 h-7 flex items-center justify-center rounded-full text-sm transition-colors ${
+              showFilters || filtered
+                ? 'bg-lime-200 text-lime-800'
+                : 'text-gray-400 hover:bg-lime-100'
+            }`}
+          >
+            ⚲
+            {/* A filter left on while the bar is collapsed is otherwise
+                invisible, and a short list looks like a short list. */}
+            {filtered && !showFilters && (
+              <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-lime-600" />
+            )}
+          </button>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-lime-500 text-white text-lg leading-none hover:bg-lime-600 transition-colors"
+            aria-label="Add task"
+          >
+            +
+          </button>
+        </div>
       </div>
+
+      {showFilters && !loading && (
+        <TaskFilterBar
+          filters={filters}
+          grouping={grouping}
+          onFiltersChange={setFilters}
+          onGroupingChange={setGrouping}
+          matchCount={visible.length}
+          totalCount={tasks.length}
+        />
+      )}
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto panel-scroll p-3 space-y-3 max-h-[60dvh] lg:max-h-none">
@@ -153,11 +181,42 @@ export function TasksPanel({ tasks, loading, onRefresh }: Props) {
           </div>
         )}
 
+        {/*
+          * Distinct from "no tasks". An emptied-out filter looks identical to
+          * an empty list, and the fix is the opposite one — clear the filter,
+          * not add a task.
+          */}
+        {!loading && tasks.length > 0 && visible.length === 0 && (
+          <div className="text-center py-5 lg:py-8">
+            <p className="text-2xl mb-2">🔍</p>
+            <p className="text-sm text-gray-500">No tasks match these filters.</p>
+            <button
+              onClick={() => setFilters(NO_FILTERS)}
+              className="mt-3 text-xs text-lime-600 font-medium hover:underline"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
+
         {!loading && (
           <div className="space-y-3">
-            <Section label="Overdue" items={overdue} accent="text-red-500" />
-            <Section label="Due today" items={dueToday} accent="text-amber-600" />
-            <Section label="Upcoming" items={upcoming} />
+            {groups.map((group) => (
+              <div key={group.key}>
+                <p
+                  className={`text-xs font-semibold uppercase tracking-wide mb-1.5 px-1 ${
+                    group.tone === 'overdue'
+                      ? 'text-red-500'
+                      : group.tone === 'today'
+                        ? 'text-amber-600'
+                        : 'text-gray-400'
+                  }`}
+                >
+                  {group.label} ({group.tasks.length})
+                </p>
+                {group.tasks.map((task) => <TaskRow key={task.id} task={task} />)}
+              </div>
+            ))}
           </div>
         )}
       </div>

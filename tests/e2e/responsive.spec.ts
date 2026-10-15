@@ -379,6 +379,92 @@ test.describe('signed in', () => {
     await expect(dialog.getByLabel('Repeat')).toBeDisabled()
   })
 
+  test.describe('task filters', () => {
+    const tasks = [
+      { id: 't1', title: 'Service the car', assigned_to: 'vasco', category: 'car', due_date: '2099-01-10' },
+      { id: 't2', title: 'Book paediatrician', assigned_to: 'jennifer', category: 'kids', due_date: '2099-01-05' },
+      { id: 't3', title: 'Plan the holiday', assigned_to: 'both', category: 'travel', due_date: null },
+    ].map((t) => ({ ...t, description: null, completed_at: null, created_by: '', created_at: '2026-10-01T00:00:00.000Z' }))
+
+    test.beforeEach(async ({ page }) => {
+      await page.route('**/api/tasks', (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(tasks) }),
+      )
+    })
+
+    async function openFilters(page: Page) {
+      await page.goto('/', { waitUntil: 'networkidle' })
+      await page.getByRole('button', { name: 'Show filters' }).click()
+    }
+
+    test('filtering by person keeps shared tasks', async ({ page }) => {
+      // A chore assigned to Both is on Vasco's plate too; hiding it would make
+      // the filter tell him he has less to do than he does.
+      await openFilters(page)
+      await page.getByRole('button', { name: 'Vasco', exact: true }).click()
+
+      await expect(page.getByText('Service the car')).toBeVisible()
+      await expect(page.getByText('Plan the holiday')).toBeVisible()
+      await expect(page.getByText('Book paediatrician')).toHaveCount(0)
+    })
+
+    test('filtering by category narrows to one', async ({ page }) => {
+      await openFilters(page)
+      await page.getByLabel('Filter by category').selectOption('kids')
+
+      await expect(page.getByText('Book paediatrician')).toBeVisible()
+      await expect(page.getByText('Service the car')).toHaveCount(0)
+    })
+
+    test('sorting regroups the list without losing tasks', async ({ page }) => {
+      await openFilters(page)
+      await page.getByLabel('Sort by').selectOption('category')
+
+      for (const title of ['Service the car', 'Book paediatrician', 'Plan the holiday']) {
+        await expect(page.getByText(title)).toBeVisible()
+      }
+      // Headings carry a count, which distinguishes them from the chip on a
+      // row and from the option in the category dropdown.
+      await expect(page.getByText('Car (1)')).toBeVisible()
+      await expect(page.getByText('Kids (1)')).toBeVisible()
+      await expect(page.getByText('Travel (1)')).toBeVisible()
+    })
+
+    test('an undated task gets its own section rather than hiding in Upcoming', async ({ page }) => {
+      await page.goto('/', { waitUntil: 'networkidle' })
+      await expect(page.getByText(/No due date/i)).toBeVisible()
+    })
+
+    test('a filter that matches nothing says so, and offers the way out', async ({ page }) => {
+      // Otherwise indistinguishable from having no tasks — and the remedy is
+      // the opposite one.
+      await openFilters(page)
+      await page.getByRole('button', { name: 'Vasco', exact: true }).click()
+      await page.getByLabel('Filter by category').selectOption('kids')
+
+      await expect(page.getByText(/no tasks match these filters/i)).toBeVisible()
+      await expect(page.getByText(/no open tasks/i)).toHaveCount(0)
+
+      await page.getByRole('button', { name: 'Clear filters' }).first().click()
+      await expect(page.getByText('Service the car')).toBeVisible()
+    })
+
+    test('an active filter stays visible once the bar is collapsed', async ({ page }) => {
+      await openFilters(page)
+      await page.getByRole('button', { name: 'Jennifer', exact: true }).click()
+      await page.getByRole('button', { name: 'Hide filters' }).click()
+
+      // The count is the signal that a short list is short on purpose.
+      await expect(page.getByText('2/3')).toBeVisible()
+    })
+
+    test('the filter bar fits the phone', async ({ page }) => {
+      await openFilters(page)
+      await assertNoHorizontalOverflow(page, '/ (task filters)')
+      await assertControlsOnScreen(page)
+    })
+  })
+
   test('a picker records the selection it was given', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: 'Add task' }).click()
