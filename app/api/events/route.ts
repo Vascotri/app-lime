@@ -5,18 +5,8 @@ import { getSupabase } from '@/lib/supabase'
 import { expandEvent } from '@/lib/recurrence'
 import { listAllEvents, GoogleReconnectRequired } from '@/lib/google-calendar'
 import { resolveSource } from '@/lib/calendar-source'
+import { agendaWindow } from '@/lib/calendar-window'
 import type { CalendarEvent } from '@/lib/types'
-
-/** How far ahead the dashboard agenda looks. */
-const WINDOW_DAYS = 14
-
-function windowFromNow(): { from: Date; to: Date } {
-  const from = new Date()
-  from.setHours(0, 0, 0, 0)
-  const to = new Date(from)
-  to.setDate(to.getDate() + WINDOW_DAYS)
-  return { from, to }
-}
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
@@ -25,7 +15,7 @@ export async function GET(request: Request) {
   }
 
   const source = resolveSource(new URL(request.url).searchParams.get('source'))
-  const { from, to } = windowFromNow()
+  const { from, to } = agendaWindow()
 
   if (source === 'google') {
     try {

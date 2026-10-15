@@ -15,6 +15,9 @@ const CATEGORY_ICONS: Record<ShoppingCategory, string> = {
   groceries: '🛒',
   home: '🏠',
   kids: '🧒',
+  pharmacy: '💊',
+  gifts: '🎁',
+  dog: '🐶',
   other: '📦',
 }
 

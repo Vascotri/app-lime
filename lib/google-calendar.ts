@@ -113,21 +113,7 @@ export async function listEvents(
   to: Date,
 ): Promise<CalendarEvent[]> {
   const calendarId = await ensureFamilyCalendar(email)
-
-  const query = new URLSearchParams({
-    timeMin: from.toISOString(),
-    timeMax: to.toISOString(),
-    singleEvents: 'true',
-    orderBy: 'startTime',
-    maxResults: '250',
-  })
-
-  const payload = (await googleFetch(
-    email,
-    `/calendars/${encodeURIComponent(calendarId)}/events?${query}`,
-  )) as { items?: GoogleEvent[] }
-
-  return toCalendarEvents(payload?.items ?? [])
+  return toCalendarEvents(await fetchEvents(email, calendarId, from, to), { origin: 'family' })
 }
 
 interface CalendarListEntry {
@@ -160,26 +146,46 @@ export async function listPersonalCalendarIds(
     .map((entry) => entry.id)
 }
 
+/**
+ * Cap on pages fetched per calendar: 5 x 250 = 1250 events.
+ *
+ * Bounds worst-case latency. Over a 90-day window a single daily recurrence
+ * already contributes 90 expanded instances, so one page is nowhere near
+ * enough and silently truncating would quietly lose days off the end.
+ */
+const MAX_PAGES = 5
+
 async function fetchEvents(
   email: string,
   calendarId: string,
   from: Date,
   to: Date,
 ): Promise<GoogleEvent[]> {
-  const query = new URLSearchParams({
-    timeMin: from.toISOString(),
-    timeMax: to.toISOString(),
-    singleEvents: 'true',
-    orderBy: 'startTime',
-    maxResults: '250',
-  })
+  const items: GoogleEvent[] = []
+  let pageToken: string | undefined
+  let pages = 0
 
-  const payload = (await googleFetch(
-    email,
-    `/calendars/${encodeURIComponent(calendarId)}/events?${query}`,
-  )) as { items?: GoogleEvent[] }
+  do {
+    const query = new URLSearchParams({
+      timeMin: from.toISOString(),
+      timeMax: to.toISOString(),
+      singleEvents: 'true',
+      orderBy: 'startTime',
+      maxResults: '250',
+    })
+    if (pageToken) query.set('pageToken', pageToken)
 
-  return payload?.items ?? []
+    const payload = (await googleFetch(
+      email,
+      `/calendars/${encodeURIComponent(calendarId)}/events?${query}`,
+    )) as { items?: GoogleEvent[]; nextPageToken?: string }
+
+    items.push(...(payload?.items ?? []))
+    pageToken = payload?.nextPageToken
+    pages += 1
+  } while (pageToken && pages < MAX_PAGES)
+
+  return items
 }
 
 function personFor(email: string): Person | undefined {

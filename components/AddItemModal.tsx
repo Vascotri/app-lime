@@ -61,7 +61,7 @@ export function AddItemModal({ onClose, onSaved }: Props) {
           options={SHOPPING_CATEGORY_LABELS}
           value={category}
           onChange={setCategory}
-          columns={2}
+          columns={3}
         />
 
         <div>

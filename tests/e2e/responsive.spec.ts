@@ -112,7 +112,7 @@ test.describe('signed in', () => {
       name: 'item',
       open: 'Add item',
       heading: 'Add item',
-      options: ['Groceries', 'Home', 'Kids', 'Other'],
+      options: ['Groceries', 'Home', 'Kids', 'Pharmacy', 'Gifts', 'Dog', 'Other'],
     },
   ]
 
