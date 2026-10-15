@@ -6,6 +6,7 @@ import type { CalendarEvent, Task, ShoppingItem } from '@/lib/types'
 import { CalendarPanel } from './CalendarPanel'
 import { TasksPanel } from './TasksPanel'
 import { ShoppingPanel } from './ShoppingPanel'
+import { ConnectGoogle } from './ConnectGoogle'
 
 interface Props {
   userName: string
@@ -70,6 +71,8 @@ export function Dashboard({ userName }: Props) {
 
       {/* Main content */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-6 py-3 sm:py-6">
+        <ConnectGoogle />
+
         {/*
          * Panels hug their content on phones — a fixed min-height reserved
          * ~60dvh per panel, so three stacked panels left most of the screen

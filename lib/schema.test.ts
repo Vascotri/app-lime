@@ -7,8 +7,9 @@ import {
   SHOPPING_CATEGORY_LABELS,
   PERSON_LABELS,
   RECURRENCE_LABELS,
-  EVENT_CATEGORY_BARS,
+  PERSON_BARS,
   PERSON_TONES,
+  PERSON_GOOGLE_COLOR_IDS,
 } from './types'
 
 /**
@@ -98,14 +99,26 @@ describe('the migration lands on the same values as a fresh schema', () => {
 })
 
 describe('every value has presentation defined', () => {
-  it('each event category has an accent bar colour', () => {
-    expect(sorted(Object.keys(EVENT_CATEGORY_BARS))).toEqual(
-      sorted(Object.keys(EVENT_CATEGORY_LABELS)),
-    )
+  it('each person has a chip tone, an accent bar and a Google colour', () => {
+    const people = sorted(Object.keys(PERSON_LABELS))
+    expect(sorted(Object.keys(PERSON_TONES))).toEqual(people)
+    expect(sorted(Object.keys(PERSON_BARS))).toEqual(people)
+    expect(sorted(Object.keys(PERSON_GOOGLE_COLOR_IDS))).toEqual(people)
   })
 
-  it('each person has a chip tone', () => {
-    expect(sorted(Object.keys(PERSON_TONES))).toEqual(sorted(Object.keys(PERSON_LABELS)))
+  it('gives each person a distinct Google colour', () => {
+    // Two people sharing a colour would make the Google calendar unreadable —
+    // the whole point of the mapping.
+    const ids = Object.values(PERSON_GOOGLE_COLOR_IDS)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('uses Google colour IDs that exist', () => {
+    // Google accepts event colorId "1".."11"; anything else is rejected on save.
+    for (const id of Object.values(PERSON_GOOGLE_COLOR_IDS)) {
+      expect(Number(id)).toBeGreaterThanOrEqual(1)
+      expect(Number(id)).toBeLessThanOrEqual(11)
+    }
   })
 
   it('"Other" sorts last in every picker, so it never pushes a real option down', () => {

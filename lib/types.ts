@@ -121,18 +121,33 @@ export function categoryTone(category: string): string {
 }
 
 export const PERSON_TONES: Record<Person, string> = {
-  vasco: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-  jennifer: 'bg-purple-50 text-purple-700 ring-1 ring-purple-200',
-  both: 'bg-gray-50 text-gray-600 ring-1 ring-gray-200',
+  vasco: 'bg-green-50 text-green-700 ring-1 ring-green-200',
+  jennifer: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+  both: 'bg-yellow-50 text-yellow-800 ring-1 ring-yellow-300',
 }
 
-/** Left accent bar on a calendar row, keyed by event category. */
-export const EVENT_CATEGORY_BARS: Record<EventCategory, string> = {
-  home: 'bg-amber-400',
-  kids: 'bg-teal-400',
-  personal: 'bg-rose-400',
-  work: 'bg-indigo-400',
-  other: 'bg-gray-300',
+/**
+ * Left accent bar on a calendar row, keyed by WHO — not by category.
+ *
+ * Google Calendar can only colour an event one way, and we use it for the
+ * assignee, since "who is doing the school run" is the question this calendar
+ * exists to answer. The bar matches that colour so the app and Google read the
+ * same way; category stays a labelled chip, which needs no colour to be clear.
+ */
+export const PERSON_BARS: Record<Person, string> = {
+  vasco: 'bg-green-500',
+  jennifer: 'bg-blue-500',
+  both: 'bg-yellow-400',
+}
+
+/**
+ * Google Calendar event colour IDs.
+ * Reference: Basil = 10 (green), Peacock = 7 (blue), Banana = 5 (yellow).
+ */
+export const PERSON_GOOGLE_COLOR_IDS: Record<Person, string> = {
+  vasco: '10',
+  jennifer: '7',
+  both: '5',
 }
 
 export const ALLOWED_EMAILS = [

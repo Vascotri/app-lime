@@ -6,7 +6,7 @@ import type { CalendarEvent } from '@/lib/types'
 import {
   RECURRENCE_LABELS,
   EVENT_CATEGORY_LABELS,
-  EVENT_CATEGORY_BARS,
+  PERSON_BARS,
   PERSON_LABELS,
   PERSON_TONES,
   categoryTone,
@@ -112,7 +112,7 @@ export function CalendarPanel({ events, loading, onRefresh }: Props) {
                 >
                   <div
                     className={`w-1 h-full min-h-[2rem] rounded-full flex-shrink-0 mt-0.5 ${
-                      EVENT_CATEGORY_BARS[ev.category] ?? EVENT_CATEGORY_BARS.other
+                      PERSON_BARS[ev.attendees] ?? PERSON_BARS.both
                     }`}
                   />
                   <div className="flex-1 min-w-0">
