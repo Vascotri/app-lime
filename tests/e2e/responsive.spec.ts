@@ -141,6 +141,63 @@ test.describe('signed in', () => {
     })
   }
 
+  /**
+   * The connect prompt depends on a Google API call the test environment
+   * cannot make, so stub the status endpoint and drive each state directly.
+   */
+  test.describe('Google Calendar connect prompt', () => {
+    async function stubStatus(page: Page, body: unknown, status = 200) {
+      await page.route('**/api/google/status', (route) =>
+        route.fulfill({
+          status,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        }),
+      )
+    }
+
+    test('invites a first connection', async ({ page }) => {
+      await stubStatus(page, { connected: false, reason: 'not_connected' })
+      await page.goto('/', { waitUntil: 'networkidle' })
+
+      await expect(page.getByText('Connect Google Calendar')).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Connect', exact: true })).toBeVisible()
+      // The access promise is load-bearing for trust — it must not go missing.
+      await expect(page.getByText(/only see the family calendar it creates/i)).toBeVisible()
+
+      await assertNoHorizontalOverflow(page, '/ (connect prompt)')
+      await assertControlsOnScreen(page)
+    })
+
+    test('asks an older session to re-consent', async ({ page }) => {
+      // Signed in before the calendar scopes existed: a session is present but
+      // unusable, and the wording has to explain why rather than just repeat
+      // the first-run invitation.
+      await stubStatus(page, { connected: false, reason: 'missing_scopes' })
+      await page.goto('/', { waitUntil: 'networkidle' })
+
+      await expect(page.getByText('Reconnect Google Calendar')).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Reconnect' })).toBeVisible()
+    })
+
+    test('stays out of the way once connected', async ({ page }) => {
+      await stubStatus(page, { connected: true, calendarId: 'family@group.calendar.google.com' })
+      await page.goto('/', { waitUntil: 'networkidle' })
+
+      await expect(page.getByText(/connect google calendar/i)).toHaveCount(0)
+      await expect(page.getByRole('heading', { name: 'Upcoming' })).toBeVisible()
+    })
+
+    test('does not cry wolf when the status check itself fails', async ({ page }) => {
+      // A broken status endpoint says nothing about whether the calendar works,
+      // so it must not push a connect prompt at someone already connected.
+      await stubStatus(page, { error: 'boom' }, 500)
+      await page.goto('/', { waitUntil: 'networkidle' })
+
+      await expect(page.getByText(/connect google calendar/i)).toHaveCount(0)
+    })
+  })
+
   test('a picker records the selection it was given', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: 'Add task' }).click()
