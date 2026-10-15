@@ -23,8 +23,6 @@ export interface CalendarEvent {
   category: EventCategory
   attendees: Attendee
   notes: string | null
-  created_by: string
-  created_at: string
   // virtual — only present on expanded recurring instances
   instance_date?: string
   /**

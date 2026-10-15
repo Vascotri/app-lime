@@ -139,8 +139,6 @@ export function toCalendarEvent(
     // says who it belongs to.
     attendees: origin === 'personal' && owner ? owner : resolveAssignee(event),
     notes: withheld ? null : event.description?.trim() || null,
-    created_by: '',
-    created_at: startAt,
     origin,
     busy: withheld || undefined,
   }

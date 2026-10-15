@@ -14,8 +14,6 @@ function event(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     category: 'other',
     attendees: 'both',
     notes: null,
-    created_by: '',
-    created_at: '2026-10-15T09:00:00.000Z',
     ...overrides,
   }
 }

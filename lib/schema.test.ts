@@ -62,14 +62,20 @@ const schema = checkConstraints(readSql('supabase', 'schema.sql'))
 const sorted = (values: string[]) => [...values].sort()
 
 describe('schema.sql matches the TypeScript unions', () => {
+  /*
+   * Events are absent on purpose: Google Calendar holds them now, so the
+   * event categories, attendees and repeat rules have no second definition to
+   * drift from. They are validated on the way in by parseEventInput instead.
+   */
   const cases: Array<[string, string, string[]]> = [
-    ['events', 'category', Object.keys(EVENT_CATEGORY_LABELS)],
-    ['events', 'attendees', Object.keys(PERSON_LABELS)],
-    ['events', 'recurrence', Object.keys(RECURRENCE_LABELS)],
     ['tasks', 'category', Object.keys(TASK_CATEGORY_LABELS)],
     ['tasks', 'assigned_to', Object.keys(PERSON_LABELS)],
     ['shopping_items', 'category', Object.keys(SHOPPING_CATEGORY_LABELS)],
   ]
+
+  it('no longer defines an events table', () => {
+    expect(schema.events, 'events should live in Google Calendar, not Postgres').toBeUndefined()
+  })
 
   for (const [table, column, expected] of cases) {
     it(`${table}.${column}`, () => {
@@ -100,12 +106,9 @@ describe('the migrations land on the same values as a fresh schema', () => {
 
   // An existing project is migrated; a new one is created from schema.sql.
   // The two must agree or the app behaves differently against each.
-  const columns = [
-    'tasks.category',
-    'events.category',
-    'events.attendees',
-    'shopping_items.category',
-  ]
+  // Only columns that still exist. Migration 001 constrains events.*, but
+  // migration 005 drops the table — it is a historical log, not a replay script.
+  const columns = ['tasks.category', 'shopping_items.category']
 
   for (const key of columns) {
     it(key, () => {

@@ -57,23 +57,14 @@ export function AddEventModal({ event, onClose, onSaved }: Props) {
     setError('')
 
     /*
-     * Send the wall-clock time as typed. The server pairs it with the
+     * Send the wall-clock time as typed; the server pairs it with the
      * calendar's zone so "09:00" stays nine o'clock, including across a DST
-     * change. start_at is the same moment as a real instant, kept only for the
-     * Supabase path — previously it was built by stamping a "Z" onto local
-     * time, which silently shifted every event by the UTC offset.
+     * change. An earlier version stamped a "Z" onto local time here, which
+     * silently shifted every event by the UTC offset.
      */
-    const start_local = allDay ? date : `${date}T${time}:00`
-    const [year, month, day] = date.split('-').map(Number)
-    const [hour, minute] = time.split(':').map(Number)
-    const start_at = allDay
-      ? `${date}T00:00:00.000Z`
-      : new Date(year, month - 1, day, hour, minute).toISOString()
-
     const payload = {
       title: title.trim(),
-      start_local,
-      start_at,
+      start_local: allDay ? date : `${date}T${time}:00`,
       all_day: allDay,
       recurrence,
       category,

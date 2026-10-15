@@ -5,24 +5,10 @@
 --
 -- The IN (...) lists below are mirrored by the union types in lib/types.ts and
 -- asserted equal by lib/schema.test.ts, so the two cannot drift apart.
-
--- Events (calendar)
-CREATE TABLE IF NOT EXISTS events (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title       TEXT NOT NULL,
-  start_at    TIMESTAMPTZ NOT NULL,
-  end_at      TIMESTAMPTZ,
-  all_day     BOOLEAN NOT NULL DEFAULT false,
-  recurrence  TEXT NOT NULL DEFAULT 'none'
-              CHECK (recurrence IN ('none','daily','weekdays','weekly','monthly','yearly')),
-  category    TEXT NOT NULL DEFAULT 'other'
-              CHECK (category IN ('home','kids','personal','work','other')),
-  attendees   TEXT NOT NULL DEFAULT 'both'
-              CHECK (attendees IN ('vasco','jennifer','both')),
-  notes       TEXT,
-  created_by  TEXT NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+--
+-- There is no events table: Google Calendar is the system of record for
+-- events, which is what lets a change made on either side appear on both
+-- without any sync. Only tasks and the shopping list live here.
 
 -- Tasks
 CREATE TABLE IF NOT EXISTS tasks (
@@ -54,14 +40,10 @@ CREATE TABLE IF NOT EXISTS shopping_items (
 -- Row Level Security
 -- All access goes through the server-side service role key (API routes),
 -- so RLS is a defence-in-depth backstop — not the primary auth layer.
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shopping_items ENABLE ROW LEVEL SECURITY;
 
 -- Service role bypasses RLS automatically; these policies cover anon/authenticated roles.
-CREATE POLICY "family_only_events" ON events
-  USING (true) WITH CHECK (true);
-
 CREATE POLICY "family_only_tasks" ON tasks
   USING (true) WITH CHECK (true);
 
