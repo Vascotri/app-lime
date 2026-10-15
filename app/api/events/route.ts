@@ -3,11 +3,44 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getSupabase } from '@/lib/supabase'
 import { expandEvent } from '@/lib/recurrence'
+import { listEvents, GoogleReconnectRequired } from '@/lib/google-calendar'
+import { resolveSource } from '@/lib/calendar-source'
 import type { CalendarEvent } from '@/lib/types'
 
-export async function GET() {
+/** How far ahead the dashboard agenda looks. */
+const WINDOW_DAYS = 14
+
+function windowFromNow(): { from: Date; to: Date } {
+  const from = new Date()
+  from.setHours(0, 0, 0, 0)
+  const to = new Date(from)
+  to.setDate(to.getDate() + WINDOW_DAYS)
+  return { from, to }
+}
+
+export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const source = resolveSource(new URL(request.url).searchParams.get('source'))
+  const { from, to } = windowFromNow()
+
+  if (source === 'google') {
+    try {
+      const events = await listEvents(session.user.email, from, to)
+      return NextResponse.json(events, { headers: { 'X-Calendar-Source': 'google' } })
+    } catch (error) {
+      if (error instanceof GoogleReconnectRequired) {
+        // 409, not 401: the session is fine, it's the Google grant that isn't.
+        // A 401 would read as "signed out" and bounce them to the login page.
+        return NextResponse.json({ error: 'reconnect_required' }, { status: 409 })
+      }
+      console.error('Google Calendar read failed:', error)
+      return NextResponse.json({ error: 'calendar_unavailable' }, { status: 502 })
+    }
+  }
 
   const { data, error } = await getSupabase()
     .from('events')
@@ -16,14 +49,8 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Expand recurring events for next 60 days (dashboard shows 14, but give some buffer)
-  const from = new Date()
-  from.setHours(0, 0, 0, 0)
-  const to = new Date(from)
-  to.setDate(to.getDate() + 14)
-
   const expanded: CalendarEvent[] = []
-  for (const event of (data as CalendarEvent[])) {
+  for (const event of data as CalendarEvent[]) {
     expanded.push(...expandEvent(event, from, to))
   }
 
@@ -33,7 +60,7 @@ export async function GET() {
     return new Date(dateA).getTime() - new Date(dateB).getTime()
   })
 
-  return NextResponse.json(expanded)
+  return NextResponse.json(expanded, { headers: { 'X-Calendar-Source': 'supabase' } })
 }
 
 export async function POST(request: Request) {

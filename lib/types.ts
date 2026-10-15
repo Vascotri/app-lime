@@ -26,6 +26,12 @@ export interface CalendarEvent {
   created_at: string
   // virtual — only present on expanded recurring instances
   instance_date?: string
+  /**
+   * This instance belongs to a repeating series. Set when the series rule
+   * itself isn't available — Google expands instances server-side and keeps
+   * the rule on the parent event.
+   */
+  recurring?: boolean
 }
 
 export interface Task {

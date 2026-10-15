@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { signOut } from 'next-auth/react'
 import type { CalendarEvent, Task, ShoppingItem } from '@/lib/types'
+
+/** Why a panel has no data — distinct from "there is genuinely none". */
+export type PanelError = 'reconnect' | 'unavailable' | null
 import { CalendarPanel } from './CalendarPanel'
 import { TasksPanel } from './TasksPanel'
 import { ShoppingPanel } from './ShoppingPanel'
@@ -18,14 +21,29 @@ export function Dashboard({ userName }: Props) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [items, setItems] = useState<ShoppingItem[]>([])
   const [loadingEvents, setLoadingEvents] = useState(true)
+  const [eventsError, setEventsError] = useState<PanelError>(null)
   const [loadingTasks, setLoadingTasks] = useState(true)
   const [loadingItems, setLoadingItems] = useState(true)
 
   const fetchEvents = useCallback(async () => {
     setLoadingEvents(true)
-    const res = await fetch('/api/events')
-    if (res.ok) setEvents(await res.json())
-    setLoadingEvents(false)
+    setEventsError(null)
+    try {
+      const res = await fetch('/api/events')
+      if (res.ok) {
+        setEvents(await res.json())
+      } else if (res.status === 409) {
+        setEventsError('reconnect')
+      } else {
+        setEventsError('unavailable')
+      }
+    } catch {
+      // A rejected fetch (offline, DNS) must still clear the skeleton, or the
+      // panel spins forever.
+      setEventsError('unavailable')
+    } finally {
+      setLoadingEvents(false)
+    }
   }, [])
 
   const fetchTasks = useCallback(async () => {
@@ -81,7 +99,12 @@ export function Dashboard({ userName }: Props) {
          */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div className="flex flex-col lg:min-h-[32rem]">
-            <CalendarPanel events={events} loading={loadingEvents} onRefresh={fetchEvents} />
+            <CalendarPanel
+              events={events}
+              loading={loadingEvents}
+              error={eventsError}
+              onRefresh={fetchEvents}
+            />
           </div>
           <div className="flex flex-col lg:min-h-[32rem]">
             <TasksPanel tasks={tasks} loading={loadingTasks} onRefresh={fetchTasks} />

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { signIn } from 'next-auth/react'
 import { format, isToday, isTomorrow, parseISO } from 'date-fns'
 import type { CalendarEvent } from '@/lib/types'
 import {
@@ -17,6 +18,7 @@ import { AddEventModal } from './AddEventModal'
 interface Props {
   events: CalendarEvent[]
   loading: boolean
+  error?: 'reconnect' | 'unavailable' | null
   onRefresh: () => void
 }
 
@@ -37,7 +39,7 @@ function groupByDay(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
   return map
 }
 
-export function CalendarPanel({ events, loading, onRefresh }: Props) {
+export function CalendarPanel({ events, loading, error, onRefresh }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null)
 
@@ -82,7 +84,43 @@ export function CalendarPanel({ events, loading, onRefresh }: Props) {
           </div>
         )}
 
-        {!loading && days.length === 0 && (
+        {/*
+          * Shown instead of the empty state, never alongside it. "No events"
+          * when the calendar is simply unreachable is a lie, and an expensive
+          * one on a calendar you are trusting to remember the school run.
+          */}
+        {!loading && error && (
+          <div className="text-center py-5 lg:py-8">
+            <p className="text-2xl mb-2">{error === 'reconnect' ? '🔑' : '⚠️'}</p>
+            <p className="text-sm text-gray-600">
+              {error === 'reconnect'
+                ? 'Google Calendar needs reconnecting.'
+                : "Couldn't load your calendar."}
+            </p>
+            <p className="mt-1 text-xs text-gray-400">
+              {error === 'reconnect'
+                ? 'Your events are safe — only the connection expired.'
+                : 'Your events are safe. This is a connection problem.'}
+            </p>
+            {error === 'reconnect' ? (
+              <button
+                onClick={() => signIn('google', { callbackUrl: '/' })}
+                className="mt-3 rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-white hover:bg-lime-600 transition-colors min-h-[44px]"
+              >
+                Reconnect
+              </button>
+            ) : (
+              <button
+                onClick={onRefresh}
+                className="mt-3 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors min-h-[44px]"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
+
+        {!loading && !error && days.length === 0 && (
           <div className="text-center py-5 lg:py-8">
             <p className="text-2xl mb-2">🗓️</p>
             <p className="text-sm text-gray-500">No events in the next 14 days.</p>
@@ -95,7 +133,7 @@ export function CalendarPanel({ events, loading, onRefresh }: Props) {
           </div>
         )}
 
-        {!loading && days.map((day) => (
+        {!loading && !error && days.map((day) => (
           <div key={day}>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 px-1">
               {dayLabel(day)}
@@ -133,11 +171,18 @@ export function CalendarPanel({ events, loading, onRefresh }: Props) {
                         label={PERSON_LABELS[ev.attendees ?? 'both']}
                         tone={PERSON_TONES[ev.attendees ?? 'both']}
                       />
-                      {ev.recurrence !== 'none' && (
+                      {/*
+                        * Google expands a series server-side and keeps the rule
+                        * on the parent, so an instance knows it repeats but not
+                        * how often. Say the honest, smaller thing in that case.
+                        */}
+                      {ev.recurrence !== 'none' ? (
                         <span className="text-xs text-lime-600 whitespace-nowrap">
                           ↻ {RECURRENCE_LABELS[ev.recurrence].toLowerCase()}
                         </span>
-                      )}
+                      ) : ev.recurring ? (
+                        <span className="text-xs text-lime-600 whitespace-nowrap">↻ repeats</span>
+                      ) : null}
                     </div>
                   </div>
                   <button
