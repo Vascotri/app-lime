@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   filterTasks,
   groupTasks,
+  splitByCompletion,
   hasActiveFilters,
   isOverdue,
   isDueToday,
@@ -64,6 +65,37 @@ describe('filterTasks', () => {
   it('applies both filters together', () => {
     expect(filterTasks(all, { owner: 'jennifer', category: 'home' })).toEqual([sharedTask])
     expect(filterTasks(all, { owner: 'vasco', category: 'kids' })).toEqual([])
+  })
+})
+
+describe('splitByCompletion', () => {
+  const openTask = task({ title: 'Still to do' })
+  const doneEarly = task({ title: 'Done early', completed_at: '2026-10-12T09:00:00.000Z' })
+  const doneLate = task({ title: 'Done late', completed_at: '2026-10-14T17:00:00.000Z' })
+
+  it('separates what is left from what is finished', () => {
+    const { open, done } = splitByCompletion([doneEarly, openTask, doneLate])
+    expect(open).toEqual([openTask])
+    expect(done).toHaveLength(2)
+  })
+
+  it('puts the most recently finished first', () => {
+    // "Did we do that?" is asked about the recent past, not the distant one.
+    const { done } = splitByCompletion([doneEarly, doneLate])
+    expect(done.map((t) => t.title)).toEqual(['Done late', 'Done early'])
+  })
+
+  it('copes with a list that is all one or all the other', () => {
+    expect(splitByCompletion([openTask]).done).toEqual([])
+    expect(splitByCompletion([doneLate]).open).toEqual([])
+    expect(splitByCompletion([])).toEqual({ open: [], done: [] })
+  })
+
+  it('keeps completed tasks out of the grouped sections', () => {
+    // A finished task has no business sitting under "Overdue".
+    const stale = task({ due_date: '2026-10-01', completed_at: '2026-10-14T17:00:00.000Z' })
+    const { open } = splitByCompletion([stale, openTask])
+    expect(groupTasks(open, 'due').some((group) => group.key === 'overdue')).toBe(false)
   })
 })
 

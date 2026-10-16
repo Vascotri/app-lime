@@ -12,6 +12,7 @@ import {
 import {
   filterTasks,
   groupTasks,
+  splitByCompletion,
   hasActiveFilters,
   isOverdue,
   isDueToday,
@@ -36,15 +37,23 @@ export function TasksPanel({ tasks, loading, onRefresh }: Props) {
   const [filters, setFilters] = useState<TaskFilters>(NO_FILTERS)
   const [grouping, setGrouping] = useState<TaskGrouping>('due')
 
-  const visible = useMemo(() => filterTasks(tasks, filters), [tasks, filters])
-  const groups = useMemo(() => groupTasks(visible, grouping), [visible, grouping])
-  const filtered = hasActiveFilters(filters)
+  const [showDone, setShowDone] = useState(false)
 
+  const visible = useMemo(() => filterTasks(tasks, filters), [tasks, filters])
+  const { open, done } = useMemo(() => splitByCompletion(visible), [visible])
+  const groups = useMemo(() => groupTasks(open, grouping), [open, grouping])
+  const filtered = hasActiveFilters(filters)
+  // The badge counts what is left to do; finished work should not inflate it.
+  const openTotal = useMemo(() => tasks.filter((task) => !task.completed_at).length, [tasks])
+
+  // Toggles both ways, so finishing something is no longer a one-way door.
   async function toggleComplete(task: Task) {
     await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ completed_at: new Date().toISOString() }),
+      body: JSON.stringify({
+        completed_at: task.completed_at ? null : new Date().toISOString(),
+      }),
     })
     onRefresh()
   }
@@ -113,9 +122,9 @@ export function TasksPanel({ tasks, loading, onRefresh }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-lg">✅</span>
           <h2 className="text-sm font-semibold text-gray-800">Tasks</h2>
-          {!loading && tasks.length > 0 && (
+          {!loading && openTotal > 0 && (
             <span className="text-xs bg-lime-100 text-lime-700 rounded-full px-2 py-0.5 font-medium">
-              {filtered ? `${visible.length}/${tasks.length}` : tasks.length}
+              {filtered ? `${open.length}/${openTotal}` : openTotal}
             </span>
           )}
         </div>
@@ -171,7 +180,7 @@ export function TasksPanel({ tasks, loading, onRefresh }: Props) {
         {!loading && tasks.length === 0 && (
           <div className="text-center py-5 lg:py-8">
             <p className="text-2xl mb-2">📋</p>
-            <p className="text-sm text-gray-500">No open tasks.</p>
+            <p className="text-sm text-gray-500">No tasks yet.</p>
             <button
               onClick={() => setShowAdd(true)}
               className="mt-3 text-xs text-lime-600 font-medium hover:underline"
@@ -199,6 +208,19 @@ export function TasksPanel({ tasks, loading, onRefresh }: Props) {
           </div>
         )}
 
+        {/*
+          * Nothing open but something done is a real state now, and a good
+          * one — worth saying rather than showing a bare panel.
+          */}
+        {!loading && open.length === 0 && done.length > 0 && (
+          <div className="text-center py-5 lg:py-8">
+            <p className="text-2xl mb-2">🎉</p>
+            <p className="text-sm text-gray-500">
+              {filtered ? 'Nothing left here.' : 'All caught up.'}
+            </p>
+          </div>
+        )}
+
         {!loading && (
           <div className="space-y-3">
             {groups.map((group) => (
@@ -217,6 +239,64 @@ export function TasksPanel({ tasks, loading, onRefresh }: Props) {
                 {group.tasks.map((task) => <TaskRow key={task.id} task={task} />)}
               </div>
             ))}
+          </div>
+        )}
+
+        {/*
+          * Collapsed by default: finished work is reference, not the job at
+          * hand. Mirrors the "N bought" section in the shopping list so the
+          * two panels behave the same way.
+          */}
+        {!loading && done.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowDone((open) => !open)}
+              aria-expanded={showDone}
+              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 px-1 py-1"
+            >
+              <span aria-hidden="true">{showDone ? '▾' : '▸'}</span>
+              {done.length} done
+            </button>
+
+            {showDone && (
+              <div className="space-y-0.5 mt-1">
+                {done.map((task) => (
+                  <div
+                    key={task.id}
+                    className="group flex items-start gap-2.5 rounded-xl px-3 py-2 hover:bg-gray-50 transition-colors"
+                  >
+                    <button
+                      onClick={() => toggleComplete(task)}
+                      className="w-5 h-5 mt-0.5 rounded-full border-2 border-lime-500 bg-lime-500 text-white text-xs leading-none flex items-center justify-center flex-shrink-0 hover:bg-lime-600 transition-colors"
+                      aria-label={`Reopen ${task.title}`}
+                      title="Reopen"
+                    >
+                      ✓
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-400 line-through truncate">{task.title}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="text-xs text-gray-300">
+                          {PERSON_LABELS[task.assigned_to]}
+                        </span>
+                        {task.completed_at && (
+                          <span className="text-xs text-gray-300">
+                            · Done {format(parseISO(task.completed_at), 'd MMM')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDelete(task.id)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs w-6 h-6 flex items-center justify-center rounded transition-all flex-shrink-0"
+                      aria-label={`Delete ${task.title}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
