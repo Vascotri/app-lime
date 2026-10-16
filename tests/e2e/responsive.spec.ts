@@ -465,6 +465,81 @@ test.describe('signed in', () => {
     })
   })
 
+  test.describe('completed tasks', () => {
+    const base = { description: null, created_by: '', created_at: '2026-10-01T00:00:00.000Z' }
+    const mixed = [
+      { ...base, id: 'o1', title: 'Service the car', assigned_to: 'vasco', category: 'car', due_date: '2099-01-10', completed_at: null },
+      { ...base, id: 'd1', title: 'Call the plumber', assigned_to: 'both', category: 'home', due_date: null, completed_at: '2026-10-14T17:00:00.000Z' },
+    ]
+
+    async function withTasks(page: Page, tasks: unknown[]) {
+      await page.route('**/api/tasks', (route) => {
+        if (route.request().method() !== 'GET') return route.continue()
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(tasks),
+        })
+      })
+      await page.goto('/', { waitUntil: 'networkidle' })
+    }
+
+    test('finished tasks are collapsed, not gone', async ({ page }) => {
+      await withTasks(page, mixed)
+
+      await expect(page.getByRole('button', { name: /1 done/ })).toBeVisible()
+      // Collapsed means the title is not on screen yet.
+      await expect(page.getByText('Call the plumber')).toHaveCount(0)
+      await expect(page.getByText('Service the car')).toBeVisible()
+    })
+
+    test('expanding reveals them with a way to reopen', async ({ page }) => {
+      await withTasks(page, mixed)
+      await page.getByRole('button', { name: /1 done/ }).click()
+
+      await expect(page.getByText('Call the plumber')).toBeVisible()
+      await expect(page.getByText(/Done 14 Oct/)).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Reopen Call the plumber' })).toBeVisible()
+    })
+
+    test('reopening clears the completion rather than deleting', async ({ page }) => {
+      let patched: Record<string, unknown> | undefined
+      await page.route('**/api/tasks/d1', async (route) => {
+        patched = route.request().postDataJSON()
+        return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
+      })
+      await withTasks(page, mixed)
+
+      await page.getByRole('button', { name: /1 done/ }).click()
+      await page.getByRole('button', { name: 'Reopen Call the plumber' }).click()
+
+      // Null, not a timestamp: completion became a toggle, not a one-way door.
+      await expect.poll(() => patched && 'completed_at' in patched).toBe(true)
+      expect(patched!.completed_at).toBeNull()
+    })
+
+    test('the open count ignores finished work', async ({ page }) => {
+      await withTasks(page, mixed)
+      // One open, one done — the badge must read 1, not 2.
+      await expect(page.locator('span.bg-lime-100').filter({ hasText: /^1$/ })).toBeVisible()
+    })
+
+    test('nothing open but something done reads as caught up, not empty', async ({ page }) => {
+      await withTasks(page, [mixed[1]])
+
+      await expect(page.getByText(/all caught up/i)).toBeVisible()
+      await expect(page.getByText(/no tasks yet/i)).toHaveCount(0)
+      await expect(page.getByRole('button', { name: /1 done/ })).toBeVisible()
+    })
+
+    test('the expanded list fits the phone', async ({ page }) => {
+      await withTasks(page, mixed)
+      await page.getByRole('button', { name: /1 done/ }).click()
+      await assertNoHorizontalOverflow(page, '/ (done tasks)')
+      await assertControlsOnScreen(page)
+    })
+  })
+
   test('a picker records the selection it was given', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: 'Add task' }).click()

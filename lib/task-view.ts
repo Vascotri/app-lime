@@ -33,6 +33,20 @@ export function filterTasks(tasks: Task[], filters: TaskFilters): Task[] {
   })
 }
 
+/**
+ * Split the list into what's still to do and what's been finished.
+ *
+ * Done tasks come back most-recently-completed first, which is the order the
+ * question "did we do that?" is usually asked in.
+ */
+export function splitByCompletion(tasks: Task[]): { open: Task[]; done: Task[] } {
+  const open = tasks.filter((task) => !task.completed_at)
+  const done = tasks
+    .filter((task) => !!task.completed_at)
+    .sort((a, b) => parseISO(b.completed_at!).getTime() - parseISO(a.completed_at!).getTime())
+  return { open, done }
+}
+
 export interface TaskGroup {
   key: string
   label: string
